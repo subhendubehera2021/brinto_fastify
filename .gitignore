@@ -5,6 +5,8 @@ dist/
 
 # dependencies
 node_modules/
+bun.lock
+bun.lockb
 
 # logs
 npm-debug.log*
