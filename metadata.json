@@ -1,0 +1,5 @@
+{
+  "name": "Brinto Astro API",
+  "description": "REST API service and interactive OpenAPI developer documentation for Brinto built with Astro.",
+  "requestFramePermissions": []
+}
