@@ -478,7 +478,10 @@ let cachedApp: FastifyInstance | null = null;
 export async function getApp(): Promise<FastifyInstance> {
   if (!cachedApp) {
     cachedApp = buildApp();
-    await cachedApp.ready();
+    await Promise.all([
+      cachedApp.ready(),
+      connectToDatabase(process.env.MONGODB_URI),
+    ]);
   }
   return cachedApp;
 }

@@ -10,8 +10,23 @@ if (!mongoose.connection.listeners('error').length) {
   });
 }
 
-let cachedPromise: Promise<typeof mongoose> | null = null;
-let lastFailedAttempt = 0;
+interface MongooseGlobalCache {
+  conn: mongoose.Connection | null;
+  promise: Promise<typeof mongoose> | null;
+  lastFailedAttempt: number;
+}
+
+const globalWithMongoose = globalThis as typeof globalThis & {
+  __mongooseCache?: MongooseGlobalCache;
+};
+
+const cache: MongooseGlobalCache = globalWithMongoose.__mongooseCache || {
+  conn: null,
+  promise: null,
+  lastFailedAttempt: 0,
+};
+globalWithMongoose.__mongooseCache = cache;
+
 const RETRY_COOLDOWN_MS = 60_000;
 
 export async function connectToDatabase(uri?: string) {
@@ -25,23 +40,24 @@ export async function connectToDatabase(uri?: string) {
     return null;
   }
 
-  if (cachedPromise && mongoose.connection.readyState === 2) {
+  if (cache.promise && mongoose.connection.readyState === 2) {
     try {
-      await cachedPromise;
+      await cache.promise;
       return mongoose.connection;
     } catch {
-      cachedPromise = null;
+      cache.promise = null;
     }
   }
 
-  if (lastFailedAttempt && Date.now() - lastFailedAttempt < RETRY_COOLDOWN_MS) {
+  if (cache.lastFailedAttempt && Date.now() - cache.lastFailedAttempt < RETRY_COOLDOWN_MS) {
     return null;
   }
 
-  const opts = {
+  const opts: mongoose.ConnectOptions = {
     bufferCommands: false,
-    maxPoolSize: 10,
-    minPoolSize: 1,
+    maxPoolSize: 5,
+    minPoolSize: 0,
+    maxIdleTimeMS: 60000,
     autoIndex: false,
     serverSelectionTimeoutMS: 3000,
     socketTimeoutMS: 30000,
@@ -49,14 +65,20 @@ export async function connectToDatabase(uri?: string) {
   };
 
   try {
-    cachedPromise = mongoose.connect(MONGODB_URI, opts);
-    await cachedPromise;
-    lastFailedAttempt = 0;
-    return mongoose.connection;
+    cache.promise = mongoose.connect(MONGODB_URI, opts);
+    await cache.promise;
+    cache.conn = mongoose.connection;
+    cache.lastFailedAttempt = 0;
+    return cache.conn;
   } catch (err) {
-    cachedPromise = null;
-    lastFailedAttempt = Date.now();
+    cache.promise = null;
+    cache.lastFailedAttempt = Date.now();
     console.warn('MongoDB not connected — some features may not work:', (err as any)?.message || err);
     return null;
   }
+}
+
+// Pre-warm database connection during serverless cold-start initialization
+if (process.env.MONGODB_URI) {
+  connectToDatabase(process.env.MONGODB_URI).catch(() => {});
 }
