@@ -115,11 +115,29 @@ export function buildHonoApp() {
     }
 
     // Connect to database for API routes
-    if (pathname.startsWith('/api/') && pathname !== '/api/openapi.json' && pathname !== '/api/health') {
-      await connectToDatabase(process.env.MONGODB_URI);
+    try {
+      if (pathname.startsWith('/api/') && pathname !== '/api/openapi.json' && pathname !== '/api/health') {
+        await connectToDatabase(process.env.MONGODB_URI);
+      }
+      await next();
+    } catch (pipelineErr: any) {
+      console.error('Request pipeline error:', pipelineErr);
+      const cors = getCorsHeaders(origin);
+      c.res = new Response(
+        JSON.stringify({
+          success: false,
+          error: pipelineErr?.message || 'Internal Server Error',
+        }),
+        {
+          status: 500,
+          headers: {
+            'Content-Type': 'application/json',
+            ...cors,
+          },
+        }
+      );
+      return;
     }
-
-    await next();
 
     const durationMs = Math.round(performance.now() - startTime);
     const timeStr = `${durationMs}ms`;
@@ -140,7 +158,7 @@ export function buildHonoApp() {
 
     // JSON timing injection and DB offline fallback
     const contentType = c.res.headers.get('content-type') || '';
-    if (contentType.includes('application/json')) {
+    if (contentType.includes('application/json') && c.res && !c.res.bodyUsed) {
       try {
         const text = await c.res.text();
         const json = JSON.parse(text);

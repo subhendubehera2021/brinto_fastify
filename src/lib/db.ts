@@ -14,7 +14,7 @@ if (!mongoose.connection.listeners('error').length) {
 let connectingPromise: Promise<mongoose.Connection | null> | null = null;
 
 export async function connectToDatabase(uri?: string): Promise<mongoose.Connection | null> {
-  if (mongoose.connection.readyState === 1) {
+  if ((mongoose.connection.readyState as number) === 1) {
     return mongoose.connection;
   }
 
@@ -24,7 +24,7 @@ export async function connectToDatabase(uri?: string): Promise<mongoose.Connecti
     return null;
   }
 
-  // Reuse ongoing connection attempt across concurrent requests
+  // Reuse ongoing connection attempt across concurrent requests in the same isolate
   if (connectingPromise) {
     try {
       const conn = await connectingPromise;
@@ -41,15 +41,19 @@ export async function connectToDatabase(uri?: string): Promise<mongoose.Connecti
     return mongoose.connection;
   }
 
+  // Optimized for Cloudflare Workers serverless environment:
+  // - maxPoolSize: 1 to strictly stay within Cloudflare Worker socket quota (max 6 open TCP sockets)
+  // - heartbeatFrequencyMS: 300000 to prevent background SDAM timers from firing I/O when worker is idle
   const opts: mongoose.ConnectOptions = {
     bufferCommands: false,
-    maxPoolSize: 10,
-    minPoolSize: 1,
-    maxIdleTimeMS: 60000,
+    maxPoolSize: 1,
+    minPoolSize: 0,
+    maxIdleTimeMS: 10000,
+    heartbeatFrequencyMS: 300000,
     autoIndex: false,
-    serverSelectionTimeoutMS: 8000,
-    socketTimeoutMS: 45000,
-    connectTimeoutMS: 8000,
+    serverSelectionTimeoutMS: 5000,
+    socketTimeoutMS: 30000,
+    connectTimeoutMS: 5000,
   };
 
   connectingPromise = (async () => {
@@ -68,9 +72,4 @@ export async function connectToDatabase(uri?: string): Promise<mongoose.Connecti
   })();
 
   return await connectingPromise;
-}
-
-// Pre-warm database connection
-if (process.env.MONGODB_URI) {
-  connectToDatabase(process.env.MONGODB_URI).catch(() => {});
 }
