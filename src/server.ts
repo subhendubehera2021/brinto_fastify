@@ -3,7 +3,7 @@ dotenv.config();
 
 const PORT = Number(process.env.PORT) || 3000;
 const HOST = process.env.HOST || '0.0.0.0';
-const FRAMEWORK = (process.env.FRAMEWORK || 'fastify').toLowerCase();
+const FRAMEWORK = (process.env.FRAMEWORK || 'hono').toLowerCase();
 
 async function startServer() {
   if (FRAMEWORK === 'hono') {

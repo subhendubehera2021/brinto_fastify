@@ -34,7 +34,7 @@ You can switch frameworks with a single command or environment variable:
 
 ### On Vercel
 In your Vercel Project Settings > **Environment Variables**, simply set:
-- `FRAMEWORK=fastify` (default) or `FRAMEWORK=hono`
+- `FRAMEWORK=hono` (default) or `FRAMEWORK=fastify`
 Redeploy without changing any source code!
 
 ---

@@ -2,7 +2,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { getApp } from '../src/app';
 import { getHonoApp } from '../src/hono-app';
 
-const FRAMEWORK = (process.env.FRAMEWORK || 'fastify').toLowerCase();
+const FRAMEWORK = (process.env.FRAMEWORK || 'hono').toLowerCase();
 
 export default async function handler(req: IncomingMessage, res: ServerResponse) {
   if (req.url === '/api/index' || req.url === '/api') {
