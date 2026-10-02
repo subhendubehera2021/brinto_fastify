@@ -327,6 +327,26 @@ export function buildHonoApp() {
   app.all('/api/order-additional-docs', dispatch(handleOrderAdditionalDocsRoute, 'Order additional docs route not found'));
   app.all('/api/order-additional-docs/*', dispatch(handleOrderAdditionalDocsRoute, 'Order additional docs route not found'));
 
+  app.onError((err, c) => {
+    console.error('Unhandled API Error:', err);
+    const origin = c.req.header('origin') || '*';
+    const cors = getCorsHeaders(origin);
+    return new Response(
+      JSON.stringify({
+        success: false,
+        error: err.message || 'Internal Server Error',
+        timestamp: new Date().toISOString(),
+      }),
+      {
+        status: 500,
+        headers: {
+          'Content-Type': 'application/json',
+          ...cors,
+        },
+      }
+    );
+  });
+
   return app;
 }
 

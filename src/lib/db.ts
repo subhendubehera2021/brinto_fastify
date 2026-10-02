@@ -4,81 +4,73 @@ import mongoose from 'mongoose';
 
 mongoose.set('bufferCommands', false);
 
+// Global error listener to prevent uncaught socket exceptions
 if (!mongoose.connection.listeners('error').length) {
-  mongoose.connection.on('error', () => {
-    // Gracefully swallow background socket errors
+  mongoose.connection.on('error', (err) => {
+    console.warn('Mongoose background connection error:', (err as any)?.message || err);
   });
 }
 
-interface MongooseGlobalCache {
-  conn: mongoose.Connection | null;
-  promise: Promise<typeof mongoose> | null;
-  lastFailedAttempt: number;
-}
+let connectingPromise: Promise<mongoose.Connection | null> | null = null;
 
-const globalWithMongoose = globalThis as typeof globalThis & {
-  __mongooseCache?: MongooseGlobalCache;
-};
-
-const cache: MongooseGlobalCache = globalWithMongoose.__mongooseCache || {
-  conn: null,
-  promise: null,
-  lastFailedAttempt: 0,
-};
-globalWithMongoose.__mongooseCache = cache;
-
-const RETRY_COOLDOWN_MS = 60_000;
-
-export async function connectToDatabase(uri?: string) {
+export async function connectToDatabase(uri?: string): Promise<mongoose.Connection | null> {
   if (mongoose.connection.readyState === 1) {
     return mongoose.connection;
   }
 
   const MONGODB_URI = uri || process.env.MONGODB_URI;
   if (!MONGODB_URI) {
-    console.warn('MongoDB not connected (MONGODB_URI not set) — using offline fallback');
+    console.warn('MongoDB not connected (MONGODB_URI not set)');
     return null;
   }
 
-  if (cache.promise && mongoose.connection.readyState === 2) {
+  // Reuse ongoing connection attempt across concurrent requests
+  if (connectingPromise) {
     try {
-      await cache.promise;
-      return mongoose.connection;
+      const conn = await connectingPromise;
+      if (conn && (mongoose.connection.readyState as number) === 1) {
+        return conn;
+      }
     } catch {
-      cache.promise = null;
+      // Continue below to initiate fresh attempt if needed
     }
   }
 
-  if (cache.lastFailedAttempt && Date.now() - cache.lastFailedAttempt < RETRY_COOLDOWN_MS) {
-    return null;
+  // If connected during wait
+  if ((mongoose.connection.readyState as number) === 1) {
+    return mongoose.connection;
   }
 
   const opts: mongoose.ConnectOptions = {
     bufferCommands: false,
-    maxPoolSize: 5,
-    minPoolSize: 0,
+    maxPoolSize: 10,
+    minPoolSize: 1,
     maxIdleTimeMS: 60000,
     autoIndex: false,
-    serverSelectionTimeoutMS: 3000,
-    socketTimeoutMS: 30000,
-    connectTimeoutMS: 5000,
+    serverSelectionTimeoutMS: 8000,
+    socketTimeoutMS: 45000,
+    connectTimeoutMS: 8000,
   };
 
-  try {
-    cache.promise = mongoose.connect(MONGODB_URI, opts);
-    await cache.promise;
-    cache.conn = mongoose.connection;
-    cache.lastFailedAttempt = 0;
-    return cache.conn;
-  } catch (err) {
-    cache.promise = null;
-    cache.lastFailedAttempt = Date.now();
-    console.warn('MongoDB not connected — some features may not work:', (err as any)?.message || err);
-    return null;
-  }
+  connectingPromise = (async () => {
+    try {
+      if ((mongoose.connection.readyState as number) === 1) {
+        return mongoose.connection;
+      }
+      await mongoose.connect(MONGODB_URI, opts);
+      return mongoose.connection;
+    } catch (err: any) {
+      console.warn('MongoDB connection error:', err?.message || err);
+      return null;
+    } finally {
+      connectingPromise = null;
+    }
+  })();
+
+  return await connectingPromise;
 }
 
-// Pre-warm database connection during serverless cold-start initialization
+// Pre-warm database connection
 if (process.env.MONGODB_URI) {
   connectToDatabase(process.env.MONGODB_URI).catch(() => {});
 }
