@@ -114,6 +114,35 @@ export function buildHonoApp() {
       });
     }
 
+    const contextId = crypto.randomUUID();
+    let cfCache: Cache | null = null;
+
+    // Check Cloudflare Edge Cache for read requests
+    if (
+      typeof caches !== 'undefined' &&
+      (caches as any)?.default &&
+      c.req.method === 'GET' &&
+      pathname.startsWith('/api/') &&
+      pathname !== '/api/health' &&
+      pathname !== '/api/openapi.json'
+    ) {
+      try {
+        cfCache = (caches as any).default as Cache;
+        const cachedMatch = await cfCache.match(c.req.raw);
+        if (cachedMatch) {
+          const respHeaders = new Headers(cachedMatch.headers);
+          respHeaders.set('X-Cache', 'HIT');
+          respHeaders.set('X-Response-Time', '1ms');
+          return new Response(cachedMatch.body, {
+            status: cachedMatch.status,
+            headers: respHeaders,
+          });
+        }
+      } catch {
+        cfCache = null;
+      }
+    }
+
     // Connect to database for API routes
     try {
       if (pathname.startsWith('/api/') && pathname !== '/api/openapi.json' && pathname !== '/api/health') {
@@ -204,6 +233,24 @@ export function buildHonoApp() {
             status: c.res.status,
             headers: c.res.headers,
           });
+        }
+
+        if (cfCache && c.res.status === 200) {
+          try {
+            const cacheHeaders = new Headers(c.res.headers);
+            cacheHeaders.set('Cache-Control', 'public, max-age=15, s-maxage=15');
+            const toCache = new Response(c.res.clone().body, {
+              status: c.res.status,
+              headers: cacheHeaders,
+            });
+            if ((c.executionCtx as any)?.waitUntil) {
+              (c.executionCtx as any).waitUntil(cfCache.put(c.req.raw, toCache));
+            } else {
+              cfCache.put(c.req.raw, toCache).catch(() => {});
+            }
+          } catch {
+            // Ignore cache write error
+          }
         }
       } catch {
         // Fallback
