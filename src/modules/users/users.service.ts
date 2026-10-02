@@ -53,7 +53,7 @@ export class UsersService {
       role: data.role && data.role.length > 0 ? data.role : ['USER'],
     });
 
-    const userObj = newUser.toObject ? newUser.toObject() : { ...newUser };
+    const userObj = (newUser as any).toObject ? (newUser as any).toObject() : { ...newUser };
     delete (userObj as any).password;
     return userObj;
   }

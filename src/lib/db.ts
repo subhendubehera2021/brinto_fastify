@@ -40,10 +40,6 @@ export async function connectToDatabase(uri?: string): Promise<mongoose.Connecti
     return mongoose.connection;
   }
 
-  // Optimized for Cloudflare Workers & Serverless:
-  // - maxPoolSize: 5 for handling concurrent queries without socket exhaustion
-  // - serverMonitoringMode: 'poll' disables persistent background streaming SDAM connections
-  // - heartbeatFrequencyMS: 300000 prevents background socket wakeups while worker is idle
   const opts: any = {
     bufferCommands: false,
     maxPoolSize: 5,
@@ -73,4 +69,47 @@ export async function connectToDatabase(uri?: string): Promise<mongoose.Connecti
   })();
 
   return await activeConnectingPromise;
+}
+
+/**
+ * Executes a database operation with complete request-context isolation in Cloudflare Workers.
+ * In Cloudflare Workers, outbound TCP sockets cannot be shared across different requests.
+ * By using a request-scoped client with automatic cleanup, every request runs in its own socket context.
+ */
+export async function withMongoCollection<T>(
+  collectionName: string,
+  operation: (collection: any) => Promise<T>
+): Promise<T> {
+  const MONGODB_URI = process.env.MONGODB_URI;
+  if (!MONGODB_URI) {
+    throw new Error('MONGODB_URI environment variable is not defined');
+  }
+
+  const isCloudflare = typeof (globalThis as any).caches !== 'undefined';
+
+  if (isCloudflare) {
+    const { MongoClient } = await import('mongodb');
+    const client = new MongoClient(MONGODB_URI, {
+      maxPoolSize: 1,
+      minPoolSize: 0,
+      serverMonitoringMode: 'poll',
+      connectTimeoutMS: 5000,
+      socketTimeoutMS: 15000,
+    });
+
+    try {
+      await client.connect();
+      const match = MONGODB_URI.match(/mongodb(?:\+srv)?:\/\/[^/]+\/([^?]+)/);
+      const dbName = match ? match[1] : 'brinto';
+      const collection = client.db(dbName).collection(collectionName);
+      return await operation(collection);
+    } finally {
+      await client.close().catch(() => {});
+    }
+  }
+
+  // Node.js server fallback: use pooled Mongoose connection
+  await connectToDatabase(MONGODB_URI);
+  const collection = mongoose.connection.collection(collectionName);
+  return await operation(collection);
 }

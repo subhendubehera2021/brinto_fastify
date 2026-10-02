@@ -177,7 +177,11 @@ export function buildHonoApp() {
       c.header(key, val);
     }
     if (!c.res.headers.has('cache-control')) {
-      c.header('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
+      if (c.req.method === 'GET' && pathname.startsWith('/api/') && pathname !== '/api/health') {
+        c.header('Cache-Control', 'public, max-age=30, s-maxage=30, stale-while-revalidate=60');
+      } else {
+        c.header('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
+      }
     }
     c.header('X-Response-Time', timeStr);
     c.header('Server-Timing', `total;dur=${durationMs}`);
