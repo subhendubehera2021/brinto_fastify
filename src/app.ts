@@ -1,10 +1,11 @@
-import 'dotenv/config';
+import dotenv from 'dotenv';
+dotenv.config();
 import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from 'fastify';
 import mongoose from 'mongoose';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 
+import './models/index';
 import { connectToDatabase } from './lib/db';
 import { getCorsHeaders } from './lib/cors';
 import { openApiSpec } from './lib/openapi';
@@ -16,8 +17,7 @@ import { handleOrdersRoute } from './modules/orders/orders.router';
 import { handlePaymentsRoute } from './modules/payments/payments.router';
 import { handleOrderAdditionalDocsRoute } from './modules/order-additional-docs/order-additional-docs.router';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const publicDir = path.resolve(__dirname, '../public');
+const publicDir = path.resolve(process.cwd(), 'public');
 
 declare module 'fastify' {
   interface FastifyRequest {
