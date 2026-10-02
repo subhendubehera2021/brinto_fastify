@@ -371,6 +371,7 @@ export function buildApp(): FastifyInstance {
       JSON.stringify({
         status: isConnected ? 'healthy' : 'degraded',
         timestamp: new Date().toISOString(),
+        engine: 'fastify',
         database: {
           connected: isConnected,
           name: mongoose.connection.name || null,

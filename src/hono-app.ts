@@ -273,6 +273,7 @@ export function buildHonoApp() {
       JSON.stringify({
         status: isConnected ? 'healthy' : 'degraded',
         timestamp: new Date().toISOString(),
+        engine: 'hono',
         database: {
           connected: isConnected,
           name: mongoose.connection.name || null,
