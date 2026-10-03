@@ -9,7 +9,7 @@ export class PaymentsDao {
     return await PaymentModel.findOneAndUpdate(
       { transactionId },
       { $set: data },
-      { new: true }
+      { returnDocument: 'after' }
     ).lean({ virtuals: true });
   }
 

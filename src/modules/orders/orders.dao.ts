@@ -85,7 +85,7 @@ export class OrdersDao {
     return await OrderModel.findOneAndUpdate(
       filter,
       { $set: data },
-      { new: true }
+      { returnDocument: 'after' }
     ).lean({ virtuals: true });
   }
 
