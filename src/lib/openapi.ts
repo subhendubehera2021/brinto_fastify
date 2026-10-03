@@ -59,6 +59,10 @@ export const openApiSpec = {
       name: 'Payments',
       description: 'Payment integration and Cashfree webhook endpoints',
     },
+    {
+      name: 'Store Owners',
+      description: 'Store management, store forms, and subscriptions',
+    },
   ],
   paths: {
     '/': {
@@ -1103,6 +1107,135 @@ export const openApiSpec = {
           '400': { description: 'Bad Request / Record not found' },
           '401': { description: 'Unauthorized' },
         },
+      },
+    },
+    '/api/store-owners/search': {
+      get: {
+        tags: ['Store Owners'],
+        summary: 'Search subscribed stores',
+        parameters: [
+          { name: 'formId', in: 'query', required: true, schema: { type: 'string' } },
+          { name: 'search', in: 'query', schema: { type: 'string' } },
+          { name: 'page', in: 'query', schema: { type: 'integer', default: 1 } },
+          { name: 'limit', in: 'query', schema: { type: 'integer', default: 20 } },
+        ],
+        responses: { '200': { description: 'Stores matching the form and active subscription' } },
+      },
+    },
+    '/api/store-owners/my-stores': {
+      get: {
+        tags: ['Store Owners'],
+        summary: 'List stores owned by the authenticated user',
+        security: [{ bearerAuth: [] }],
+        responses: { '200': { description: 'Owned stores' }, '401': { description: 'Unauthorized' } },
+      },
+      post: {
+        tags: ['Store Owners'],
+        summary: 'Create a store for the authenticated user',
+        security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: { 'application/json': { schema: {
+            type: 'object',
+            required: ['storeName', 'displayName', 'contactNumber', 'ownerName'],
+            properties: {
+              storeName: { type: 'string' }, displayName: { type: 'string' },
+              contactNumber: { type: 'string' }, whatsappNumber: { type: 'string' },
+              ownerName: { type: 'string' }, storeRef: { type: 'string' }, logo: { type: 'string' },
+            },
+          } } },
+        },
+        responses: { '201': { description: 'Store created' }, '401': { description: 'Unauthorized' } },
+      },
+    },
+    '/api/store-owners/my-stores/{storeId}': {
+      get: {
+        tags: ['Store Owners'], summary: 'Get an owned store', security: [{ bearerAuth: [] }],
+        parameters: [{ name: 'storeId', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: 'Store details' }, '404': { description: 'Store not found' } },
+      },
+      patch: {
+        tags: ['Store Owners'], summary: 'Update an owned store', security: [{ bearerAuth: [] }],
+        parameters: [{ name: 'storeId', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object' } } } },
+        responses: { '200': { description: 'Store updated' }, '404': { description: 'Store not found' } },
+      },
+      delete: {
+        tags: ['Store Owners'], summary: 'Deactivate an owned store', security: [{ bearerAuth: [] }],
+        parameters: [{ name: 'storeId', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: 'Store deactivated' }, '404': { description: 'Store not found' } },
+      },
+    },
+    '/api/store-owners/admin/stores': {
+      get: {
+        tags: ['Store Owners'], summary: 'Admin list of stores', security: [{ bearerAuth: [] }],
+        parameters: [
+          { name: 'status', in: 'query', schema: { type: 'string', enum: ['ACTIVE', 'INACTIVE', 'PENDING'] } },
+          { name: 'page', in: 'query', schema: { type: 'integer', default: 1 } },
+          { name: 'limit', in: 'query', schema: { type: 'integer', default: 20 } },
+        ],
+        responses: { '200': { description: 'Paginated store list' }, '403': { description: 'Admin role required' } },
+      },
+    },
+    '/api/store-owners/admin/stores/{storeId}': {
+      get: {
+        tags: ['Store Owners'], summary: 'Admin get any store', security: [{ bearerAuth: [] }],
+        parameters: [{ name: 'storeId', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: 'Store details including user information' }, '404': { description: 'Store not found' } },
+      },
+    },
+    '/api/store-owners/store-forms': {
+      post: {
+        tags: ['Store Owners'], summary: 'Associate a form with a store', security: [{ bearerAuth: [] }],
+        requestBody: { required: true, content: { 'application/json': { schema: {
+          type: 'object', required: ['storeId', 'formId'],
+          properties: { storeId: { type: 'string' }, formId: { type: 'string' } },
+        } } } },
+        responses: { '201': { description: 'Form association created' }, '404': { description: 'Store or form not found' } },
+      },
+    },
+    '/api/store-owners/store-forms/store/{storeId}': {
+      get: {
+        tags: ['Store Owners'], summary: 'List forms associated with a store', security: [{ bearerAuth: [] }],
+        parameters: [{ name: 'storeId', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: 'Paginated store forms' }, '404': { description: 'Store not found' } },
+      },
+    },
+    '/api/store-owners/store-forms/{id}/toggle': {
+      patch: {
+        tags: ['Store Owners'], summary: 'Set store-form active status', security: [{ bearerAuth: [] }],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: { required: true, content: { 'application/json': { schema: {
+          type: 'object', required: ['isActive'], properties: { isActive: { type: 'boolean' } },
+        } } } },
+        responses: { '200': { description: 'Mapping updated' }, '404': { description: 'Mapping not found' } },
+      },
+    },
+    '/api/store-owners/store-forms/{id}': {
+      delete: {
+        tags: ['Store Owners'], summary: 'Remove a store-form association', security: [{ bearerAuth: [] }],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: 'Mapping removed' }, '404': { description: 'Mapping not found' } },
+      },
+    },
+    '/api/store-owners/store-subscriptions/plans': {
+      get: { tags: ['Store Owners'], summary: 'List active subscription plans', responses: { '200': { description: 'Active plans' } } },
+    },
+    '/api/store-owners/store-subscriptions/my-subscription/{storeId}': {
+      get: {
+        tags: ['Store Owners'], summary: 'Get a store subscription', security: [{ bearerAuth: [] }],
+        parameters: [{ name: 'storeId', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: 'Current subscription' }, '404': { description: 'Store not found' } },
+      },
+    },
+    '/api/store-owners/store-subscriptions/subscribe': {
+      post: {
+        tags: ['Store Owners'], summary: 'Create a pending store subscription', security: [{ bearerAuth: [] }],
+        requestBody: { required: true, content: { 'application/json': { schema: {
+          type: 'object', required: ['storeId', 'planId'],
+          properties: { storeId: { type: 'string' }, planId: { type: 'string' } },
+        } } } },
+        responses: { '201': { description: 'Pending subscription created' }, '409': { description: 'Store already has a valid plan' } },
       },
     },
     '/api/payments/create': {

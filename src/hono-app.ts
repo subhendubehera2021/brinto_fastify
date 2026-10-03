@@ -16,6 +16,7 @@ import { handleDocumentsRoute } from './modules/documents/documents.router';
 import { handleOrdersRoute } from './modules/orders/orders.router';
 import { handlePaymentsRoute } from './modules/payments/payments.router';
 import { handleOrderAdditionalDocsRoute } from './modules/order-additional-docs/order-additional-docs.router';
+import { handleStoreOwnersRoute } from './modules/store-owners/store-owners.router';
 
 const publicDir = path.resolve(process.cwd(), 'public');
 
@@ -299,6 +300,7 @@ export function buildHonoApp() {
           documents: '/api/documents',
           orderAdditionalDocs: '/api/order-additional-docs',
           payments: '/api/payments',
+          storeOwners: '/api/store-owners',
         },
         timestamp: new Date().toISOString(),
       }),
@@ -395,6 +397,9 @@ export function buildHonoApp() {
 
   app.all('/api/order-additional-docs', dispatch(handleOrderAdditionalDocsRoute, 'Order additional docs route not found'));
   app.all('/api/order-additional-docs/*', dispatch(handleOrderAdditionalDocsRoute, 'Order additional docs route not found'));
+
+  app.all('/api/store-owners', dispatch(handleStoreOwnersRoute, 'Store owner route not found'));
+  app.all('/api/store-owners/*', dispatch(handleStoreOwnersRoute, 'Store owner route not found'));
 
   app.onError((err, c) => {
     console.error('Unhandled API Error:', err);
