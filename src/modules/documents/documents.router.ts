@@ -13,5 +13,10 @@ export async function handleDocumentsRoute(request: Request, url: URL): Promise<
     return await documentsController.getAllDocs(request, url);
   }
 
+  const detailsMatch = pathname.match(/^\/api\/documents\/([^/]+)$/);
+  if (detailsMatch && method === 'GET') {
+    return await documentsController.getDocById(request, detailsMatch[1]);
+  }
+
   return null;
 }

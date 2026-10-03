@@ -1,4 +1,3 @@
-import { Types } from 'mongoose';
 import UserDocModel, { type IUserDoc } from '../../models/user-doc.model';
 
 export class DocumentsDao {
@@ -19,6 +18,14 @@ export class DocumentsDao {
     ]);
 
     return { docs, total };
+  }
+
+  async getUserDocById(
+    id: string,
+    conditions: Record<string, any>,
+    selectedFields: Record<string, any> = {}
+  ): Promise<IUserDoc | null> {
+    return await UserDocModel.findOne({ _id: id, ...conditions }, selectedFields).lean().exec() as IUserDoc | null;
   }
 }
 

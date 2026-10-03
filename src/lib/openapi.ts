@@ -259,6 +259,22 @@ export const openApiSpec = {
         },
       },
     },
+    '/api/documents/{id}': {
+      get: {
+        tags: ['Documents'],
+        summary: 'Get User Document Details',
+        description: 'Fetches document metadata by MongoDB ID for the authenticated owner; binary file data is not returned',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: 'Document metadata' },
+          '400': { description: 'Invalid document ID' },
+          '401': { description: 'Unauthorized' },
+          '404': { description: 'Document not found or not owned by the user' },
+        },
+      },
+    },
     '/api/orders/my-orders': {
       get: {
         tags: ['Orders'],

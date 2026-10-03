@@ -1,5 +1,6 @@
 import documentsService from './documents.service';
 import { getAuthUser } from '../../lib/auth';
+import { Types } from 'mongoose';
 
 function jsonResponse(status: number, body: Record<string, any>): Response {
   return new Response(JSON.stringify(body), {
@@ -29,6 +30,19 @@ export class DocumentsController {
       page,
       limit,
     });
+  }
+
+  async getDocById(request: Request, id: string): Promise<Response> {
+    const user = getAuthUser(request);
+    if (!user) return unauthorizedResponse();
+    if (!Types.ObjectId.isValid(id)) {
+      return jsonResponse(400, { success: false, message: 'Invalid document ID.' });
+    }
+
+    const doc = await documentsService.getDocById(user.id, id);
+    if (!doc) return jsonResponse(404, { success: false, message: 'Document not found.' });
+
+    return jsonResponse(200, { success: true, data: doc });
   }
 }
 
