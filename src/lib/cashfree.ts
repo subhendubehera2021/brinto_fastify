@@ -1,3 +1,5 @@
+import { Cashfree, CFEnvironment, type CreateOrderRequest } from 'cashfree-pg';
+
 export interface CashfreeUser {
   user_id?: string;
   id?: string;
@@ -29,6 +31,15 @@ const CASHFREE_BASE_URL_PROD = 'https://api.cashfree.com/pg';
 const CASHFREE_BASE_URL_SANDBOX = 'https://sandbox.cashfree.com/pg';
 const CASHFREE_API_VERSION = '2023-08-01';
 
+async function useCashfreeSdk(): Promise<boolean> {
+  const setting = (await getEnvVar('CASHFREE_USE_SDK')).trim().toLowerCase();
+  if (!setting) return true;
+  if (setting === 'true') return true;
+  if (setting === 'false') return false;
+
+  throw new Error('[Cashfree Config Error] CASHFREE_USE_SDK must be "true" or "false".');
+}
+
 class CashFreeService {
   /**
    * Helper to retrieve and validate Cashfree credentials from environment.
@@ -55,8 +66,22 @@ class CashFreeService {
     return { appId, secretKey };
   }
 
+  private createSdkClient(appId: string, secretKey: string, isSandbox: boolean) {
+    const client = new Cashfree(
+      isSandbox ? CFEnvironment.SANDBOX : CFEnvironment.PRODUCTION,
+      appId,
+      secretKey,
+      undefined,
+      undefined,
+      undefined,
+      false
+    );
+    client.XApiVersion = CASHFREE_API_VERSION;
+    return client;
+  }
+
   /**
-   * Core order creation logic using native edge fetch.
+   * Creates an order through the SDK or the direct API, selected by CASHFREE_USE_SDK.
    */
   async createOrder(user: CashfreeUser, data: CreateOrderOptions, isSandbox: boolean = false) {
     if (!data || data.amount === undefined || data.amount === null || Number(data.amount) <= 0) {
@@ -66,7 +91,7 @@ class CashFreeService {
     const { appId, secretKey } = await this.getCredentials(isSandbox);
     const baseUrl = isSandbox ? CASHFREE_BASE_URL_SANDBOX : CASHFREE_BASE_URL_PROD;
 
-    const requestPayload: any = {
+    const requestPayload: CreateOrderRequest = {
       order_amount: Number(data.amount),
       order_currency: 'INR',
       customer_details: {
@@ -86,6 +111,12 @@ class CashFreeService {
     }
 
     try {
+      if (await useCashfreeSdk()) {
+        const response = await this.createSdkClient(appId, secretKey, isSandbox)
+          .PGCreateOrder(requestPayload);
+        return response.data;
+      }
+
       const response = await fetch(`${baseUrl}/orders`, {
         method: 'POST',
         headers: {
@@ -106,17 +137,17 @@ class CashFreeService {
       }
 
       return resData;
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error(
         `[Cashfree] Error creating ${isSandbox ? 'Sandbox' : 'Production'} order:`,
-        error?.message || error
+        error instanceof Error ? error.message : error
       );
       throw error;
     }
   }
 
   /**
-   * Core order verification logic using native edge fetch.
+   * Verifies an order through the SDK or the direct API, selected by CASHFREE_USE_SDK.
    */
   async verifyOrder(orderId: string, isSandbox: boolean = false) {
     if (!orderId || !orderId.trim()) {
@@ -127,6 +158,12 @@ class CashFreeService {
     const baseUrl = isSandbox ? CASHFREE_BASE_URL_SANDBOX : CASHFREE_BASE_URL_PROD;
 
     try {
+      if (await useCashfreeSdk()) {
+        const response = await this.createSdkClient(appId, secretKey, isSandbox)
+          .PGFetchOrder(orderId);
+        return response.data;
+      }
+
       const response = await fetch(`${baseUrl}/orders/${encodeURIComponent(orderId)}`, {
         method: 'GET',
         headers: {
@@ -145,10 +182,10 @@ class CashFreeService {
       }
 
       return resData;
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error(
         `[Cashfree] Error verifying ${isSandbox ? 'Sandbox' : 'Production'} order ${orderId}:`,
-        error?.message || error
+        error instanceof Error ? error.message : error
       );
       throw error;
     }

@@ -54,7 +54,11 @@ Redeploy without changing any source code!
    CASHFREE_TEST_SECRET_KEY=
    CASHFREE_PROD_APP_ID=
    CASHFREE_PROD_SECRET_KEY=
+   CASHFREE_USE_SDK=true
    ```
+
+   `CASHFREE_USE_SDK` selects the Cashfree integration: `true` uses the SDK, while
+   `false` uses the direct API implementation. It defaults to `true` when unset.
 
 ---
 
