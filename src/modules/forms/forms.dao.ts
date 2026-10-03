@@ -170,7 +170,7 @@ export class FormsDao {
   }
 
   async updateBasicForm(id: string | Types.ObjectId, formData: Partial<IForms>): Promise<IForms | null> {
-    return await FormsModel.findByIdAndUpdate(id, formData, { new: true }).exec();
+    return await FormsModel.findByIdAndUpdate(id, formData, { returnDocument: 'after' }).exec();
   }
 
   async createOrderCapabilities(capData: any) {
@@ -181,7 +181,7 @@ export class FormsDao {
     return await FormOrderCapabilitiesModel.findOneAndUpdate(
       { form: formId },
       capData,
-      { new: true, upsert: true }
+      { returnDocument: 'after', upsert: true }
     ).exec();
   }
 
@@ -220,19 +220,19 @@ export class FormsDao {
     return await FormPricingModel.findOneAndUpdate(
       { form: pricingData.form },
       pricingData,
-      { new: true, upsert: true }
+      { returnDocument: 'after', upsert: true }
     ).exec();
   }
 
   async updateFormStatus(id: string | Types.ObjectId, status: string) {
-    return await FormsModel.findByIdAndUpdate(id, { status }, { new: true }).exec();
+    return await FormsModel.findByIdAndUpdate(id, { status }, { returnDocument: 'after' }).exec();
   }
 
   async updateRequireDocuments(id: string | Types.ObjectId, requireDocuments: string[]) {
     return await FormsModel.findByIdAndUpdate(
       id,
       { requireDocuments },
-      { new: true }
+      { returnDocument: 'after' }
     ).populate({ path: 'requireDocuments', model: DocumentTypeModel }).exec();
   }
 
@@ -240,7 +240,7 @@ export class FormsDao {
     return await FormsModel.findOneAndUpdate(
       { formId },
       { requireDocuments },
-      { new: true }
+      { returnDocument: 'after' }
     ).populate({ path: 'requireDocuments', model: DocumentTypeModel }).exec();
   }
 

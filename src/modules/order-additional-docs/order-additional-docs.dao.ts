@@ -26,7 +26,7 @@ export class OrderAdditionalDocsDao {
           isDeleted: false,
         },
       },
-      { upsert: true, new: true }
+      { upsert: true, returnDocument: 'after' }
     ).lean();
   }
 
@@ -46,7 +46,7 @@ export class OrderAdditionalDocsDao {
     return await OrderAdditionalDocsModel.findByIdAndUpdate(
       id,
       { $set: { isDeleted: true, isActive: false } },
-      { new: true }
+      { returnDocument: 'after' }
     ).lean();
   }
 }
