@@ -1212,9 +1212,11 @@ export const openApiSpec = {
     },
     '/api/store-owners/store-forms/store/{storeId}': {
       get: {
-        tags: ['Store Owners'], summary: 'List forms associated with a store', security: [{ bearerAuth: [] }],
+        tags: ['Store Owners'], summary: 'List forms associated with a store',
+        description: 'Public endpoint that fetches forms associated with the supplied store ID',
+        security: [],
         parameters: [{ name: 'storeId', in: 'path', required: true, schema: { type: 'string' } }],
-        responses: { '200': { description: 'Paginated store forms' }, '404': { description: 'Store not found' } },
+        responses: { '200': { description: 'Paginated forms; an unknown store ID returns an empty list' } },
       },
     },
     '/api/store-owners/store-forms/{id}/toggle': {

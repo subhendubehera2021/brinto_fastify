@@ -90,10 +90,8 @@ const storeOwnersController = {
     }
     match = pathname.match(/^\/api\/store-owners\/store-forms\/store\/([^/]+)$/);
     if (match && method === 'GET') {
-      const user = requireUser(request, storeOwnerRoles);
-      const store = await storeOwnersService.getStoreByCustomId(match[1], user.id, hasRole(user, 'ADMIN'));
       return result(200, 'Forms fetched successfully', () => storeOwnersService.getFormsForStore(
-        store.store_id, page, pageParam(url, 'limit', 10, 100),
+        match![1], page, pageParam(url, 'limit', 10, 100),
         searchParams.get('status') || undefined, searchParams.get('search') || undefined
       ));
     }
