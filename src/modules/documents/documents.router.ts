@@ -15,6 +15,11 @@ export async function handleDocumentsRoute(request: Request, url: URL): Promise<
     return await documentsController.getUserUploadUrl(request);
   }
 
+  const uploadStatusMatch = pathname.match(/^\/api\/documents\/([^/]+)\/upload-status$/);
+  if (uploadStatusMatch && method === 'PATCH') {
+    return await documentsController.updateDocUploadStatus(request, uploadStatusMatch[1]);
+  }
+
   // GET /api/documents or GET /api/documents/list
   if ((pathname === '/api/documents' || pathname === '/api/documents/list') && method === 'GET') {
     return await documentsController.getAllDocs(request, url);

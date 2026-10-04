@@ -1,4 +1,4 @@
-import documentsService, { R2ConfigurationError } from './documents.service';
+import documentsService, { DocumentUploadError, R2ConfigurationError } from './documents.service';
 import { getAuthUser } from '../../lib/auth';
 import { Types } from 'mongoose';
 
@@ -43,6 +43,35 @@ export class DocumentsController {
     if (!doc) return jsonResponse(404, { success: false, message: 'Document not found.' });
 
     return jsonResponse(200, { success: true, data: doc });
+  }
+
+  async updateDocUploadStatus(request: Request, id: string): Promise<Response> {
+    const user = getAuthUser(request);
+    if (!user || !Types.ObjectId.isValid(user.id)) return unauthorizedResponse();
+    if (!Types.ObjectId.isValid(id)) {
+      return jsonResponse(400, { success: false, message: 'Invalid document ID.' });
+    }
+
+    const parsedBody: unknown = await request.json().catch(() => ({}));
+    if (!parsedBody || typeof parsedBody !== 'object' || Array.isArray(parsedBody)) {
+      return jsonResponse(400, { success: false, message: 'Request body must be a JSON object.' });
+    }
+    const uploaded = (parsedBody as Record<string, unknown>).uploaded;
+    if (typeof uploaded !== 'boolean') {
+      return jsonResponse(400, { success: false, message: 'uploaded must be a boolean.' });
+    }
+
+    try {
+      const document = await documentsService.updateUserDocumentUploaded(user.id, id, uploaded);
+      return jsonResponse(200, { success: true, message: 'Document upload status updated.', data: document });
+    } catch (error: unknown) {
+      if (error instanceof DocumentUploadError || error instanceof R2ConfigurationError) {
+        const status = error instanceof DocumentUploadError ? error.status : 500;
+        return jsonResponse(status, { success: false, message: error.message });
+      }
+      console.error('Error updating document upload status:', error);
+      return jsonResponse(500, { success: false, message: 'Failed to update document upload status.' });
+    }
   }
 
   async getBlogUploadUrl(request: Request): Promise<Response> {

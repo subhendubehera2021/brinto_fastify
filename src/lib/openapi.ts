@@ -275,6 +275,29 @@ export const openApiSpec = {
         },
       },
     },
+    '/api/documents/{id}/upload-status': {
+      patch: {
+        tags: ['Documents'],
+        summary: 'Update User Document Upload Status',
+        description: 'Updates the authenticated user document status. Setting uploaded=true requires the R2 object to exist.',
+        security: [{ bearerAuth: [] }],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: {
+          required: true,
+          content: { 'application/json': { schema: {
+            type: 'object', required: ['uploaded'],
+            properties: { uploaded: { type: 'boolean' } },
+          } } },
+        },
+        responses: {
+          '200': { description: 'Document upload status updated' },
+          '400': { description: 'Invalid ID or request body' },
+          '401': { description: 'Unauthorized' },
+          '404': { description: 'Document not found or not owned by the user' },
+          '409': { description: 'R2 object has not been uploaded' },
+        },
+      },
+    },
     '/api/get-blog-upload-url': {
       post: {
         tags: ['Documents'],
@@ -303,7 +326,7 @@ export const openApiSpec = {
       post: {
         tags: ['Documents'],
         summary: 'Generate Authenticated User Upload URL',
-        description: 'Creates a 10-minute Cloudflare R2 presigned PUT URL scoped to the authenticated user',
+        description: 'Creates a pending document record and a 10-minute Cloudflare R2 presigned PUT URL scoped to the authenticated user',
         security: [{ bearerAuth: [] }],
         requestBody: {
           required: true,
@@ -317,7 +340,7 @@ export const openApiSpec = {
           } } },
         },
         responses: {
-          '200': { description: 'User-scoped presigned upload URL and object key' },
+          '200': { description: 'User-scoped presigned upload URL, object key, and pending document ID' },
           '400': { description: 'Missing or invalid fileName/contentType' },
           '401': { description: 'Unauthorized' },
           '500': { description: 'R2 configuration or signing error' },

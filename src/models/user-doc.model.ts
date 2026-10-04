@@ -13,6 +13,8 @@ export interface IUserDoc extends Document {
   uploadType?: string;
   fileSize?: number;
   file_url?: string;
+  storageKey?: string;
+  uploaded?: boolean;
   isDeleted?: boolean;
 }
 
@@ -37,6 +39,8 @@ const userDocSchema: Schema<IUserDoc> = new Schema(
     },
     fileSize: { type: Number },
     file_url: { type: String },
+    storageKey: { type: String },
+    uploaded: { type: Boolean },
     isDeleted: { type: Boolean, default: false },
   },
   { timestamps: true }
@@ -44,7 +48,8 @@ const userDocSchema: Schema<IUserDoc> = new Schema(
 
 // Custom validation: Ensure either fileData or file_url is present
 userDocSchema.pre('validate', async function () {
-  if (!this.fileData && !this.file_url) {
+  const isPendingR2Upload = this.uploaded === false && Boolean(this.storageKey);
+  if (!this.fileData && !this.file_url && !isPendingR2Upload) {
     throw new Error('Either fileData or file_url is required.');
   }
 });

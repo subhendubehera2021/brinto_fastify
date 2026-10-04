@@ -27,6 +27,25 @@ export class DocumentsDao {
   ): Promise<IUserDoc | null> {
     return await UserDocModel.findOne({ _id: id, ...conditions }, selectedFields).lean().exec() as IUserDoc | null;
   }
+
+  async createPendingUserDoc(data: Record<string, unknown>) {
+    return await UserDocModel.create(data);
+  }
+
+  async getUserDocUploadDetails(id: string, userId: string) {
+    return await UserDocModel.findOne({ _id: id, user: userId, isDeleted: { $ne: true } })
+      .select('storageKey uploaded')
+      .lean()
+      .exec();
+  }
+
+  async setUserDocUploaded(id: string, userId: string, uploaded: boolean) {
+    return await UserDocModel.findOneAndUpdate(
+      { _id: id, user: userId, isDeleted: { $ne: true } },
+      { $set: { uploaded } },
+      { new: true }
+    ).select('_id uploaded').lean().exec();
+  }
 }
 
 export default new DocumentsDao();
