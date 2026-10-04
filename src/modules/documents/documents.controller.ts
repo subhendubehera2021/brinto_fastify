@@ -1,4 +1,4 @@
-import documentsService from './documents.service';
+import documentsService, { R2ConfigurationError } from './documents.service';
 import { getAuthUser } from '../../lib/auth';
 import { Types } from 'mongoose';
 
@@ -43,6 +43,53 @@ export class DocumentsController {
     if (!doc) return jsonResponse(404, { success: false, message: 'Document not found.' });
 
     return jsonResponse(200, { success: true, data: doc });
+  }
+
+  async getBlogUploadUrl(request: Request): Promise<Response> {
+    return this.createUploadUrl(request);
+  }
+
+  async getUserUploadUrl(request: Request): Promise<Response> {
+    const user = getAuthUser(request);
+    if (!user || !Types.ObjectId.isValid(user.id)) return unauthorizedResponse();
+    return this.createUploadUrl(request, new Types.ObjectId(user.id).toHexString());
+  }
+
+  private async createUploadUrl(request: Request, userId?: string): Promise<Response> {
+    const parsedBody: unknown = await request.json().catch(() => ({}));
+    if (!parsedBody || typeof parsedBody !== 'object' || Array.isArray(parsedBody)) {
+      return jsonResponse(400, { success: false, message: 'Request body must be a JSON object.' });
+    }
+    const body = parsedBody as Record<string, unknown>;
+    const fileName = typeof body.fileName === 'string' ? body.fileName.trim() : '';
+    if (!fileName) {
+      return jsonResponse(400, { success: false, message: 'fileName is required.' });
+    }
+
+    if (body.contentType !== undefined && typeof body.contentType !== 'string') {
+      return jsonResponse(400, { success: false, message: 'contentType must be a string.' });
+    }
+
+    const contentType = typeof body.contentType === 'string' && body.contentType.trim()
+      ? body.contentType.trim()
+      : 'application/pdf';
+    const uploadType = userId ? 'user' : 'blog';
+
+    try {
+      const result = userId
+        ? await documentsService.getUserUploadUrl(userId, fileName, contentType)
+        : await documentsService.getBlogUploadUrl(fileName, contentType);
+      return jsonResponse(200, { success: true, ...result });
+    } catch (error: unknown) {
+      if (error instanceof R2ConfigurationError) {
+        return jsonResponse(500, { success: false, message: error.message });
+      }
+      console.error(
+        `Error generating ${uploadType} R2 upload URL:`,
+        error instanceof Error ? error.message : error
+      );
+      return jsonResponse(500, { success: false, message: `Failed to generate ${uploadType} upload URL.` });
+    }
   }
 }
 

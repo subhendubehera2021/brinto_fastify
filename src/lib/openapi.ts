@@ -275,6 +275,55 @@ export const openApiSpec = {
         },
       },
     },
+    '/api/get-blog-upload-url': {
+      post: {
+        tags: ['Documents'],
+        summary: 'Generate Blog Upload URL',
+        description: 'Creates a 10-minute Cloudflare R2 presigned PUT URL for a blog file',
+        security: [],
+        requestBody: {
+          required: true,
+          content: { 'application/json': { schema: {
+            type: 'object',
+            required: ['fileName'],
+            properties: {
+              fileName: { type: 'string', example: 'blog-document.pdf' },
+              contentType: { type: 'string', default: 'application/pdf' },
+            },
+          } } },
+        },
+        responses: {
+          '200': { description: 'Presigned upload URL and object key' },
+          '400': { description: 'Missing or invalid fileName/contentType' },
+          '500': { description: 'R2 configuration or signing error' },
+        },
+      },
+    },
+    '/api/get-user-upload-url': {
+      post: {
+        tags: ['Documents'],
+        summary: 'Generate Authenticated User Upload URL',
+        description: 'Creates a 10-minute Cloudflare R2 presigned PUT URL scoped to the authenticated user',
+        security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: { 'application/json': { schema: {
+            type: 'object',
+            required: ['fileName'],
+            properties: {
+              fileName: { type: 'string', example: 'document.pdf' },
+              contentType: { type: 'string', default: 'application/pdf' },
+            },
+          } } },
+        },
+        responses: {
+          '200': { description: 'User-scoped presigned upload URL and object key' },
+          '400': { description: 'Missing or invalid fileName/contentType' },
+          '401': { description: 'Unauthorized' },
+          '500': { description: 'R2 configuration or signing error' },
+        },
+      },
+    },
     '/api/orders/my-orders': {
       get: {
         tags: ['Orders'],

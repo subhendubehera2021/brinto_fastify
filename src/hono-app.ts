@@ -146,7 +146,13 @@ export function buildHonoApp() {
 
     // Connect to database for API routes
     try {
-      if (pathname.startsWith('/api/') && pathname !== '/api/openapi.json' && pathname !== '/api/health') {
+      if (
+        pathname.startsWith('/api/') &&
+        pathname !== '/api/openapi.json' &&
+        pathname !== '/api/health' &&
+        pathname !== '/api/get-blog-upload-url' &&
+        pathname !== '/api/get-user-upload-url'
+      ) {
         await connectToDatabase(process.env.MONGODB_URI);
       }
       await next();
@@ -388,6 +394,8 @@ export function buildHonoApp() {
 
   app.all('/api/documents', dispatch(handleDocumentsRoute, 'Document route not found'));
   app.all('/api/documents/*', dispatch(handleDocumentsRoute, 'Document route not found'));
+  app.all('/api/get-blog-upload-url', dispatch(handleDocumentsRoute, 'Document route not found'));
+  app.all('/api/get-user-upload-url', dispatch(handleDocumentsRoute, 'Document route not found'));
 
   app.all('/api/orders', dispatch(handleOrdersRoute, 'Order route not found'));
   app.all('/api/orders/*', dispatch(handleOrdersRoute, 'Order route not found'));

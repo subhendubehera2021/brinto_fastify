@@ -289,7 +289,13 @@ export function buildApp(): FastifyInstance {
       return reply.code(204).send();
     }
 
-    if (pathname.startsWith('/api/') && pathname !== '/api/openapi.json' && pathname !== '/api/health') {
+    if (
+      pathname.startsWith('/api/') &&
+      pathname !== '/api/openapi.json' &&
+      pathname !== '/api/health' &&
+      pathname !== '/api/get-blog-upload-url' &&
+      pathname !== '/api/get-user-upload-url'
+    ) {
       await connectToDatabase(process.env.MONGODB_URI);
     }
   });
@@ -416,6 +422,24 @@ export function buildApp(): FastifyInstance {
     );
   });
   app.all('/api/documents/*', async (req, reply) => {
+    return await dispatchModuleRouter(
+      req,
+      reply,
+      handleDocumentsRoute,
+      'Document route not found',
+      'Internal Document Error'
+    );
+  });
+  app.all('/api/get-blog-upload-url', async (req, reply) => {
+    return await dispatchModuleRouter(
+      req,
+      reply,
+      handleDocumentsRoute,
+      'Document route not found',
+      'Internal Document Error'
+    );
+  });
+  app.all('/api/get-user-upload-url', async (req, reply) => {
     return await dispatchModuleRouter(
       req,
       reply,
