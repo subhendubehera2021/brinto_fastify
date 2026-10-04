@@ -16,6 +16,7 @@ import { handleDocumentsRoute } from './modules/documents/documents.router';
 import { handleOrdersRoute } from './modules/orders/orders.router';
 import { handlePaymentsRoute } from './modules/payments/payments.router';
 import { handleOrderAdditionalDocsRoute } from './modules/order-additional-docs/order-additional-docs.router';
+import { handleFieldValuesRoute } from './modules/field-values/field-values.router';
 import { handleStoreOwnersRoute } from './modules/store-owners/store-owners.router';
 
 const publicDir = path.resolve(process.cwd(), 'public');
@@ -333,6 +334,7 @@ export function buildApp(): FastifyInstance {
           users: '/api/users',
           forms: '/api/forms',
           orders: '/api/orders',
+          fieldValues: '/api/field-values',
           documents: '/api/documents',
           orderAdditionalDocs: '/api/order-additional-docs',
           payments: '/api/payments',
@@ -454,6 +456,26 @@ export function buildApp(): FastifyInstance {
   });
   app.all('/api/orders/*', async (req, reply) => {
     return await dispatchModuleRouter(req, reply, handleOrdersRoute, 'Order route not found', 'Internal Order Error');
+  });
+
+  // Field Values module routes (legacy migration)
+  app.all('/api/field-values', async (req, reply) => {
+    return await dispatchModuleRouter(
+      req,
+      reply,
+      handleFieldValuesRoute,
+      'Field value route not found',
+      'Internal Field Value Error'
+    );
+  });
+  app.all('/api/field-values/*', async (req, reply) => {
+    return await dispatchModuleRouter(
+      req,
+      reply,
+      handleFieldValuesRoute,
+      'Field value route not found',
+      'Internal Field Value Error'
+    );
   });
 
   // Payments module routes

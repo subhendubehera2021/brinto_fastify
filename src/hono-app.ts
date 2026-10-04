@@ -16,6 +16,7 @@ import { handleDocumentsRoute } from './modules/documents/documents.router';
 import { handleOrdersRoute } from './modules/orders/orders.router';
 import { handlePaymentsRoute } from './modules/payments/payments.router';
 import { handleOrderAdditionalDocsRoute } from './modules/order-additional-docs/order-additional-docs.router';
+import { handleFieldValuesRoute } from './modules/field-values/field-values.router';
 import { handleStoreOwnersRoute } from './modules/store-owners/store-owners.router';
 
 const publicDir = path.resolve(process.cwd(), 'public');
@@ -302,6 +303,7 @@ export function buildHonoApp() {
           users: '/api/users',
           forms: '/api/forms',
           orders: '/api/orders',
+          fieldValues: '/api/field-values',
           documents: '/api/documents',
           orderAdditionalDocs: '/api/order-additional-docs',
           payments: '/api/payments',
@@ -398,6 +400,9 @@ export function buildHonoApp() {
 
   app.all('/api/orders', dispatch(handleOrdersRoute, 'Order route not found'));
   app.all('/api/orders/*', dispatch(handleOrdersRoute, 'Order route not found'));
+
+  app.all('/api/field-values', dispatch(handleFieldValuesRoute, 'Field value route not found'));
+  app.all('/api/field-values/*', dispatch(handleFieldValuesRoute, 'Field value route not found'));
 
   app.all('/api/payments', dispatch(handlePaymentsRoute, 'Payment route not found'));
   app.all('/api/payments/*', dispatch(handlePaymentsRoute, 'Payment route not found'));

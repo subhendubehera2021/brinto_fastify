@@ -44,6 +44,10 @@ export const openApiSpec = {
       description: 'Order management endpoints',
     },
     {
+      name: 'Field Values',
+      description: 'Legacy field values CRUD endpoints migrated to the new API structure',
+    },
+    {
       name: 'Forms',
       description: 'Form management and input mapping endpoints',
     },
@@ -810,6 +814,117 @@ export const openApiSpec = {
         },
         responses: {
           '200': { description: 'Promo code applied successfully' },
+        },
+      },
+    },
+    '/api/field-values': {
+      post: {
+        tags: ['Field Values'],
+        summary: 'Create Field Value(s)',
+        description: 'Creates one field value or multiple field values for an order',
+        security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                oneOf: [
+                  {
+                    type: 'object',
+                    required: ['orderId', 'inputDef', 'value'],
+                    properties: {
+                      orderId: { type: 'string', example: 'ORD-1790493446580' },
+                      inputDef: { type: 'string', example: '66e56934d97f74c4923efc55' },
+                      fieldName: { type: 'string', example: 'Father Name' },
+                      bindValue: { type: 'string', example: 'father_s_name' },
+                      value: { type: 'string', example: 'John Doe' },
+                    },
+                  },
+                  {
+                    type: 'array',
+                    items: {
+                      type: 'object',
+                      properties: {
+                        orderId: { type: 'string', example: 'ORD-1790493446580' },
+                        inputDef: { type: 'string', example: '66e56934d97f74c4923efc55' },
+                        fieldName: { type: 'string', example: 'Father Name' },
+                        bindValue: { type: 'string', example: 'father_s_name' },
+                        value: { type: 'string', example: 'John Doe' },
+                      },
+                    },
+                  },
+                ],
+              },
+            },
+          },
+        },
+        responses: {
+          '201': { description: 'Field value(s) created successfully' },
+          '401': { description: 'Unauthorized' },
+          '403': { description: 'Forbidden' },
+        },
+      },
+    },
+    '/api/field-values/order/{orderId}': {
+      get: {
+        tags: ['Field Values'],
+        summary: 'Get Field Values By Order ID',
+        description: 'Returns all field values for a specific order',
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          { name: 'orderId', in: 'path', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: 'Field values fetched successfully' },
+          '401': { description: 'Unauthorized' },
+          '403': { description: 'Forbidden' },
+        },
+      },
+    },
+    '/api/field-values/{id}': {
+      put: {
+        tags: ['Field Values'],
+        summary: 'Update Field Value',
+        description: 'Updates a specific field value record by ID',
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                properties: {
+                  value: { type: 'string', example: 'Updated value' },
+                  fieldName: { type: 'string', example: 'Father Name' },
+                  bindValue: { type: 'string', example: 'father_s_name' },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          '200': { description: 'Field value updated successfully' },
+          '401': { description: 'Unauthorized' },
+          '403': { description: 'Forbidden' },
+          '404': { description: 'Field value not found' },
+        },
+      },
+      delete: {
+        tags: ['Field Values'],
+        summary: 'Delete Field Value',
+        description: 'Deletes a specific field value record by ID',
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: 'Field value deleted successfully' },
+          '401': { description: 'Unauthorized' },
+          '403': { description: 'Forbidden' },
+          '404': { description: 'Field value not found' },
         },
       },
     },
