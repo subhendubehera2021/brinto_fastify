@@ -109,6 +109,7 @@ export class DocumentsService {
     if (!document) throw new DocumentUploadError('Document not found.', 404);
 
     let fileUrl: string | undefined;
+    let fileSize: number | undefined;
     if (uploaded) {
       if (!document.storageKey) {
         throw new DocumentUploadError('Document has no R2 upload key.', 409);
@@ -128,7 +129,8 @@ export class DocumentsService {
         credentials: { accessKeyId, secretAccessKey },
       });
       try {
-        await r2.send(new HeadObjectCommand({ Bucket: bucketName, Key: document.storageKey }));
+        const object = await r2.send(new HeadObjectCommand({ Bucket: bucketName, Key: document.storageKey }));
+        if (typeof object.ContentLength === 'number') fileSize = object.ContentLength;
       } catch (error: any) {
         if (error?.$metadata?.httpStatusCode === 404 || error?.name === 'NotFound' || error?.name === 'NoSuchKey') {
           throw new DocumentUploadError('Uploaded file was not found in R2.', 409);
@@ -138,7 +140,7 @@ export class DocumentsService {
       fileUrl = `https://doc.brinto.in/${document.storageKey}`;
     }
 
-    const updated = await documentsDao.setUserDocUploaded(documentId, userId, uploaded, fileUrl);
+    const updated = await documentsDao.setUserDocUploaded(documentId, userId, uploaded, fileUrl, fileSize);
     if (!updated) throw new DocumentUploadError('Document not found.', 404);
     return updated;
   }
