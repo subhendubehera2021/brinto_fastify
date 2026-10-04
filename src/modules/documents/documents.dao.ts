@@ -39,12 +39,15 @@ export class DocumentsDao {
       .exec();
   }
 
-  async setUserDocUploaded(id: string, userId: string, uploaded: boolean) {
+  async setUserDocUploaded(id: string, userId: string, uploaded: boolean, fileUrl?: string) {
+    const update: Record<string, unknown> = { uploaded };
+    if (fileUrl !== undefined) update.file_url = fileUrl;
+
     return await UserDocModel.findOneAndUpdate(
       { _id: id, user: userId, isDeleted: { $ne: true } },
-      { $set: { uploaded } },
+      { $set: update },
       { new: true }
-    ).select('_id uploaded').lean().exec();
+    ).select('_id uploaded file_url').lean().exec();
   }
 }
 

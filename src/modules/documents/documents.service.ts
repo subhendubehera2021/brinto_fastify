@@ -108,6 +108,7 @@ export class DocumentsService {
     const document = await documentsDao.getUserDocUploadDetails(documentId, userId);
     if (!document) throw new DocumentUploadError('Document not found.', 404);
 
+    let fileUrl: string | undefined;
     if (uploaded) {
       if (!document.storageKey) {
         throw new DocumentUploadError('Document has no R2 upload key.', 409);
@@ -134,9 +135,10 @@ export class DocumentsService {
         }
         throw error;
       }
+      fileUrl = `https://doc.brinto.in/${document.storageKey}`;
     }
 
-    const updated = await documentsDao.setUserDocUploaded(documentId, userId, uploaded);
+    const updated = await documentsDao.setUserDocUploaded(documentId, userId, uploaded, fileUrl);
     if (!updated) throw new DocumentUploadError('Document not found.', 404);
     return updated;
   }
