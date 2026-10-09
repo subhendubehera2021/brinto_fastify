@@ -25,7 +25,6 @@ export interface CreateMockTestInput {
 }
 
 export interface SubmitMockTestAttemptInput {
-  testId: number;
   sessionId: string;
   mobile: string;
   timeTaken: number;
@@ -145,16 +144,23 @@ export async function getMockTestById(testId: number) {
   };
 }
 
-export async function createMockTestSession(displayName: string, mobile: string) {
+export async function createMockTestSession(displayName: string, mobile: string, testId: number) {
+  const testResult = await getTursoClient().execute({
+    sql: 'SELECT id FROM tests WHERE id = ?',
+    args: [testId],
+  });
+  if (!testResult.rows[0]) throw new MocktestNotFoundError('Mock test not found');
+
   const sessionId = crypto.randomUUID();
   const result = await getTursoClient().execute({
-    sql: 'INSERT INTO sessions (id, display_name, mobile) VALUES (?, ?, ?) RETURNING id, display_name, created_at, last_seen',
-    args: [sessionId, displayName, mobile],
+    sql: 'INSERT INTO sessions (id, display_name, mobile, test_id) VALUES (?, ?, ?, ?) RETURNING id, display_name, test_id, created_at, last_seen',
+    args: [sessionId, displayName, mobile, testId],
   });
   const session = result.rows[0];
   return {
     id: String(session.id),
     displayName: session.display_name === null ? null : String(session.display_name),
+    testId: Number(session.test_id),
     createdAt: session.created_at,
     lastSeen: session.last_seen,
   };
@@ -165,17 +171,21 @@ export async function submitMockTestAttempt(input: SubmitMockTestAttemptInput) {
   const transaction = await client.transaction('write');
 
   try {
-    const testResult = await transaction.execute({
-      sql: 'SELECT id FROM tests WHERE id = ?',
-      args: [input.testId],
-    });
-    if (!testResult.rows[0]) throw new MocktestNotFoundError('Mock test not found');
-
     const sessionResult = await transaction.execute({
-      sql: 'SELECT id FROM sessions WHERE id = ? AND mobile = ?',
+      sql: 'SELECT test_id FROM sessions WHERE id = ? AND mobile = ?',
       args: [input.sessionId, input.mobile],
     });
     if (!sessionResult.rows[0]) throw new MocktestSubmissionError('Session not found for this user');
+    const testId = Number(sessionResult.rows[0].test_id);
+    if (!Number.isSafeInteger(testId) || testId < 1) {
+      throw new MocktestSubmissionError('Session is not associated with a mock test');
+    }
+
+    const testResult = await transaction.execute({
+      sql: 'SELECT id FROM tests WHERE id = ?',
+      args: [testId],
+    });
+    if (!testResult.rows[0]) throw new MocktestNotFoundError('Mock test not found');
 
     const questionResult = await transaction.execute({
       sql: `SELECT q.id AS question_id, q.section, o.id AS option_id, o.is_correct
@@ -183,7 +193,7 @@ export async function submitMockTestAttempt(input: SubmitMockTestAttemptInput) {
         LEFT JOIN options o ON o.question_id = q.id
         WHERE q.test_id = ?
         ORDER BY q.id, o.id`,
-      args: [input.testId],
+      args: [testId],
     });
     const questions = new Map<number, {
       section: string;
@@ -249,7 +259,7 @@ export async function submitMockTestAttempt(input: SubmitMockTestAttemptInput) {
         (test_id, session_id, score, correct, wrong, skipped, marked, time_taken, total_questions)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         RETURNING id, submitted_at`,
-      args: [input.testId, input.sessionId, correct, correct, wrong, skipped, marked, input.timeTaken, questions.size],
+      args: [testId, input.sessionId, correct, correct, wrong, skipped, marked, input.timeTaken, questions.size],
     });
     const attempt = attemptResult.rows[0];
     const attemptId = Number(attempt.id);
@@ -275,7 +285,7 @@ export async function submitMockTestAttempt(input: SubmitMockTestAttemptInput) {
 
     await transaction.execute({
       sql: 'UPDATE tests SET attempts = attempts + 1 WHERE id = ?',
-      args: [input.testId],
+      args: [testId],
     });
     await transaction.execute({
       sql: 'UPDATE sessions SET last_seen = CURRENT_TIMESTAMP WHERE id = ?',
@@ -285,7 +295,7 @@ export async function submitMockTestAttempt(input: SubmitMockTestAttemptInput) {
 
     return {
       id: attemptId,
-      testId: input.testId,
+      testId,
       score: correct,
       correct,
       wrong,

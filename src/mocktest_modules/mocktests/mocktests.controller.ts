@@ -180,23 +180,30 @@ export async function createMockTestSessionRequest(request: Request): Promise<Re
     return jsonResponse({ success: false, error: 'A verified mobile number is required in the authentication token.' }, 403);
   }
 
+  let input: unknown;
   try {
-    const session = await createMockTestSession(user.user_name || user.user_id || user.id, user.mobile);
+    input = await request.json();
+  } catch {
+    return jsonResponse({ success: false, error: 'Request body must be valid JSON' }, 400);
+  }
+  if (!isRecord(input) || typeof input.testId !== 'number' || !Number.isSafeInteger(input.testId) || input.testId < 1) {
+    return jsonResponse({ success: false, error: 'testId must be a positive integer' }, 400);
+  }
+
+  try {
+    const session = await createMockTestSession(user.user_name || user.user_id || user.id, user.mobile, input.testId);
     return jsonResponse({ success: true, data: session }, 201);
   } catch (error) {
     return respondToAttemptError(error);
   }
 }
 
-export async function submitMockTestAttemptRequest(request: Request, rawTestId: string): Promise<Response> {
+export async function submitMockTestAttemptRequest(request: Request): Promise<Response> {
   const user = authorizeMocktestUser(request);
   if (isResponse(user)) return user;
   if (!user.mobile) {
     return jsonResponse({ success: false, error: 'A verified mobile number is required in the authentication token.' }, 403);
   }
-
-  const testId = validateTestId(rawTestId);
-  if (testId === null) return jsonResponse({ success: false, error: 'testId must be a positive integer' }, 400);
 
   let input: unknown;
   try {
@@ -209,11 +216,7 @@ export async function submitMockTestAttemptRequest(request: Request, rawTestId: 
   if (validationError) return jsonResponse({ success: false, error: validationError }, 400);
 
   try {
-    const result = await submitMockTestAttempt({
-      ...(input as Omit<SubmitMockTestAttemptInput, 'testId' | 'mobile'>),
-      testId,
-      mobile: user.mobile,
-    });
+    const result = await submitMockTestAttempt({ ...(input as Omit<SubmitMockTestAttemptInput, 'mobile'>), mobile: user.mobile });
     return jsonResponse({ success: true, message: 'Mock test attempt submitted successfully', data: result }, 201);
   } catch (error) {
     return respondToAttemptError(error);

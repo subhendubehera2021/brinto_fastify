@@ -138,7 +138,21 @@ export const openApiSpec = {
       post: {
         tags: ['Mocktests'],
         summary: 'Create Mock Test Session',
-        description: 'Creates a session for an authenticated student. The verified mobile claim from the JWT is stored for user-specific attempt lookup.',
+        description: 'Creates a test-specific session for an authenticated student. The verified mobile claim from the JWT is stored for user-specific attempt lookup.',
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['testId'],
+                properties: {
+                  testId: { type: 'integer', minimum: 1, example: 1 },
+                },
+              },
+            },
+          },
+        },
         responses: {
           '201': { description: 'Session created successfully' },
           '401': { description: 'Missing, expired, or invalid authentication token' },
@@ -164,14 +178,11 @@ export const openApiSpec = {
         },
       },
     },
-    '/api/mocktests/{testId}/attempts': {
+    '/api/mocktests/attempts': {
       post: {
         tags: ['Mocktests'],
         summary: 'Submit Mock Test Attempt',
-        description: 'Scores submitted answers on the server and atomically stores the attempt, answers, and section totals. The session must belong to the authenticated user mobile. Score is the number of correct answers. Questions omitted from answers are counted as skipped.',
-        parameters: [
-          { name: 'testId', in: 'path', required: true, schema: { type: 'integer', minimum: 1 } },
-        ],
+        description: 'Looks up the test from the authenticated user session, scores answers on the server, and atomically stores the attempt, answers, and section totals. The session must belong to the authenticated user mobile. Score is the number of correct answers. Questions omitted from answers are counted as skipped.',
         requestBody: {
           required: true,
           content: {

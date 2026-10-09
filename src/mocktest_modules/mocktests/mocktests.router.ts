@@ -18,9 +18,8 @@ export async function handleMocktestsRoute(request: Request, url: URL): Promise<
     return await createMockTestSessionRequest(request);
   }
 
-  const attemptMatch = url.pathname.match(/^\/api\/mocktests\/(\d+)\/attempts$/);
-  if (attemptMatch && request.method === 'POST') {
-    return await submitMockTestAttemptRequest(request, attemptMatch[1]);
+  if (url.pathname === '/api/mocktests/attempts' && request.method === 'POST') {
+    return await submitMockTestAttemptRequest(request);
   }
 
   const testMatch = url.pathname.match(/^\/api\/mocktests\/(\d+)$/);
