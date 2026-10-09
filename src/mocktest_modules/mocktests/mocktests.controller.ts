@@ -251,7 +251,7 @@ export async function getMyMocktestAttemptsRequest(request: Request, url: URL): 
 
   const limit = Math.min(requestedLimit, 50);
   try {
-    const result = await getUserMocktestAttempts(identity.owner, requestedPage, limit);
+    const result = await getUserMocktestAttempts(identity.owner, requestedPage, limit, identity.guestId);
     return jsonResponse({
       success: true,
       data: result.attempts,

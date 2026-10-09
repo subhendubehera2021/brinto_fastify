@@ -319,7 +319,7 @@ export async function submitMockTestAttempt(input: SubmitMockTestAttemptInput) {
   }
 }
 
-export async function getUserMocktestAttempts(owner: MocktestOwner, page: number, limit: number) {
+export async function getUserMocktestAttempts(owner: MocktestOwner, page: number, limit: number, guestId?: string) {
   const client = getTursoClient();
   const offset = (page - 1) * limit;
   if (Boolean(owner.mobile) === Boolean(owner.guestIdHash)) {
@@ -327,15 +327,18 @@ export async function getUserMocktestAttempts(owner: MocktestOwner, page: number
   }
   const ownerCondition = owner.mobile
     ? 's.mobile = ? AND s.guest_id_hash IS NULL'
-    : 's.guest_id_hash = ? AND s.mobile IS NULL';
+    : 's.guest_id_hash IN (?, ?) AND s.mobile IS NULL';
   const ownerValue = owner.mobile || owner.guestIdHash;
+  const ownerValues = owner.mobile
+    ? [ownerValue]
+    : [ownerValue, guestId ?? ownerValue];
   const [countResult, attemptsResult] = await Promise.all([
     client.execute({
       sql: `SELECT COUNT(*) AS total
         FROM attempts a
         INNER JOIN sessions s ON s.id = a.session_id
         WHERE ${ownerCondition}`,
-      args: [ownerValue],
+      args: ownerValues,
     }),
     client.execute({
       sql: `SELECT a.id AS attempt_id, a.test_id, t.title, t.exam,
@@ -347,7 +350,7 @@ export async function getUserMocktestAttempts(owner: MocktestOwner, page: number
         WHERE ${ownerCondition}
         ORDER BY a.submitted_at DESC, a.id DESC
         LIMIT ? OFFSET ?`,
-      args: [ownerValue, limit, offset],
+      args: [...ownerValues, limit, offset],
     }),
   ]);
 
