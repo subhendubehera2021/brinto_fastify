@@ -1,4 +1,4 @@
-import { handleCorsPreflight } from '../lib/cors';
+import { handleCorsPreflight } from '../../lib/cors';
 import { createMockTestRequest } from './mocktests.controller';
 
 export async function handleMocktestsRoute(request: Request, url: URL): Promise<Response | null> {

@@ -1,6 +1,6 @@
-import { getTursoClient } from '../lib/turso';
+import { getTursoClient } from '../../lib/turso';
 
-export { TursoDatabaseConfigurationError as MocktestsDatabaseConfigurationError } from '../lib/turso';
+export { TursoDatabaseConfigurationError as MocktestsDatabaseConfigurationError } from '../../lib/turso';
 
 export interface CreateMockTestInput {
   title: string;
