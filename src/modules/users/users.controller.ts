@@ -32,7 +32,6 @@ export class UsersController {
     }
 
     const result = await usersService.authenticateMobile(mobile, isInputMobile, loginPlatform);
-    const cacheHeader = result.isCacheHit ? 'HIT' : 'MISS';
 
     return jsonResponse(
       200,
@@ -40,7 +39,10 @@ export class UsersController {
         success: true,
         data: result.data,
       },
-      { 'X-Cache': cacheHeader }
+      {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
+        'X-Cache': 'BYPASS',
+      }
     );
   }
 
