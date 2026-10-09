@@ -81,14 +81,15 @@ export const openApiSpec = {
       get: {
         tags: ['Mocktest Passages'],
         summary: 'Get a Random Passage',
-        description: 'Returns one random passage, optionally filtered by exact test_name. Responses are not shared-cached so repeated requests can return different passages.',
+        description: 'Returns one random passage, optionally filtered by exact test_name and excluding passage IDs supplied through exclude_ids. Pass multiple IDs as comma-separated values or repeated exclude_ids parameters. Responses are not shared-cached so repeated requests can return different passages.',
         security: [],
         parameters: [
           { name: 'test_name', in: 'query', required: false, schema: { type: 'string' }, example: 'SSC CGL' },
+          { name: 'exclude_ids', in: 'query', required: false, schema: { type: 'array', items: { type: 'integer', minimum: 1 } }, style: 'form', explode: false, example: '12,15' },
         ],
         responses: {
           '200': { description: 'One random matching passage' },
-          '400': { description: 'test_name was empty' },
+          '400': { description: 'test_name was empty or exclude_ids contains an invalid passage ID' },
           '404': { description: 'No matching passage exists' },
           '503': { description: 'Turso configuration is missing' },
         },

@@ -81,8 +81,19 @@ export async function getRandomPassageRequest(url: URL): Promise<Response> {
     return jsonResponse({ success: false, error: 'test_name cannot be empty' }, 400);
   }
 
+  const rawExcludedIds = url.searchParams.getAll('exclude_ids').flatMap((value) => value.split(','));
+  const excludedIds: number[] = [];
+  for (const rawId of rawExcludedIds) {
+    const value = rawId.trim();
+    const id = Number(value);
+    if (!value || !Number.isSafeInteger(id) || id < 1) {
+      return jsonResponse({ success: false, error: 'exclude_ids must contain positive integer passage IDs' }, 400);
+    }
+    excludedIds.push(id);
+  }
+
   try {
-    const data = await getRandomPassage(rawTestName?.trim());
+    const data = await getRandomPassage(rawTestName?.trim(), [...new Set(excludedIds)]);
     if (!data) return jsonResponse({ success: false, error: 'No passage found' }, 404);
     return jsonResponse({ success: true, data }, 200);
   } catch (error) {

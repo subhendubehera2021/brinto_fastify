@@ -36,20 +36,26 @@ export async function createPassage(inputs: CreatePassageInput | CreatePassageIn
   }
 }
 
-export async function getRandomPassage(testName?: string) {
-  const result = testName
-    ? await getTursoClient().execute({
-        sql: `SELECT id, passage_text, test_name, created_at
-          FROM mocktest_passages
-          WHERE test_name = ?
-          ORDER BY RANDOM()
-          LIMIT 1`,
-        args: [testName],
-      })
-    : await getTursoClient().execute(`SELECT id, passage_text, test_name, created_at
-        FROM mocktest_passages
-        ORDER BY RANDOM()
-        LIMIT 1`);
+export async function getRandomPassage(testName?: string, excludedIds: number[] = []) {
+  const conditions: string[] = [];
+  const args: Array<string | number> = [];
+  if (testName) {
+    conditions.push('test_name = ?');
+    args.push(testName);
+  }
+  if (excludedIds.length > 0) {
+    conditions.push(`id NOT IN (${excludedIds.map(() => '?').join(', ')})`);
+    args.push(...excludedIds);
+  }
+  const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+  const result = await getTursoClient().execute({
+    sql: `SELECT id, passage_text, test_name, created_at
+      FROM mocktest_passages
+      ${whereClause}
+      ORDER BY RANDOM()
+      LIMIT 1`,
+    args,
+  });
 
   const passage = result.rows[0];
   if (!passage) return null;
