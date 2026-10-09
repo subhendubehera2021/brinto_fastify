@@ -24,13 +24,19 @@ export interface CreateMockTestInput {
 
 export interface SubmitMockTestAttemptInput {
   sessionId: string;
-  mobile: string;
+  mobile: string | null;
+  guestIdHash: string | null;
   timeTaken: number;
   answers: Array<{
     questionId: number;
     selectedOptionId: number | null;
     isMarked?: boolean;
   }>;
+}
+
+export interface MocktestOwner {
+  mobile: string | null;
+  guestIdHash: string | null;
 }
 
 export class MocktestNotFoundError extends Error {}
@@ -138,7 +144,7 @@ export async function getMockTestById(testId: number) {
   };
 }
 
-export async function createMockTestSession(displayName: string, mobile: string, testId: number) {
+export async function createMockTestSession(displayName: string, owner: MocktestOwner, testId: number) {
   const testResult = await getTursoClient().execute({
     sql: 'SELECT id FROM tests WHERE id = ?',
     args: [testId],
@@ -147,8 +153,8 @@ export async function createMockTestSession(displayName: string, mobile: string,
 
   const sessionId = crypto.randomUUID();
   const result = await getTursoClient().execute({
-    sql: 'INSERT INTO sessions (id, display_name, mobile, test_id) VALUES (?, ?, ?, ?) RETURNING id, display_name, test_id, created_at, last_seen',
-    args: [sessionId, displayName, mobile, testId],
+    sql: 'INSERT INTO sessions (id, display_name, mobile, guest_id_hash, test_id) VALUES (?, ?, ?, ?, ?) RETURNING id, display_name, test_id, created_at, last_seen',
+    args: [sessionId, displayName, owner.mobile, owner.guestIdHash, testId],
   });
   const session = result.rows[0];
   return {
@@ -165,9 +171,16 @@ export async function submitMockTestAttempt(input: SubmitMockTestAttemptInput) {
   const transaction = await client.transaction('write');
 
   try {
+    if (Boolean(input.mobile) === Boolean(input.guestIdHash)) {
+      throw new MocktestSubmissionError('Exactly one session owner identity is required');
+    }
+    const ownerCondition = input.mobile
+      ? 'mobile = ? AND guest_id_hash IS NULL'
+      : 'guest_id_hash = ? AND mobile IS NULL';
+    const ownerValue = input.mobile || input.guestIdHash;
     const sessionResult = await transaction.execute({
-      sql: 'SELECT test_id FROM sessions WHERE id = ? AND mobile = ?',
-      args: [input.sessionId, input.mobile],
+      sql: `SELECT test_id FROM sessions WHERE id = ? AND ${ownerCondition}`,
+      args: [input.sessionId, ownerValue],
     });
     if (!sessionResult.rows[0]) throw new MocktestSubmissionError('Session not found for this user');
     const testId = Number(sessionResult.rows[0].test_id);
@@ -306,16 +319,23 @@ export async function submitMockTestAttempt(input: SubmitMockTestAttemptInput) {
   }
 }
 
-export async function getUserMocktestAttempts(mobile: string, page: number, limit: number) {
+export async function getUserMocktestAttempts(owner: MocktestOwner, page: number, limit: number) {
   const client = getTursoClient();
   const offset = (page - 1) * limit;
+  if (Boolean(owner.mobile) === Boolean(owner.guestIdHash)) {
+    throw new MocktestSubmissionError('Exactly one user identity is required');
+  }
+  const ownerCondition = owner.mobile
+    ? 's.mobile = ? AND s.guest_id_hash IS NULL'
+    : 's.guest_id_hash = ? AND s.mobile IS NULL';
+  const ownerValue = owner.mobile || owner.guestIdHash;
   const [countResult, attemptsResult] = await Promise.all([
     client.execute({
       sql: `SELECT COUNT(*) AS total
         FROM attempts a
         INNER JOIN sessions s ON s.id = a.session_id
-        WHERE s.mobile = ?`,
-      args: [mobile],
+        WHERE ${ownerCondition}`,
+      args: [ownerValue],
     }),
     client.execute({
       sql: `SELECT a.id AS attempt_id, a.test_id, t.title, t.exam,
@@ -324,10 +344,10 @@ export async function getUserMocktestAttempts(mobile: string, page: number, limi
         FROM attempts a
         INNER JOIN sessions s ON s.id = a.session_id
         INNER JOIN tests t ON t.id = a.test_id
-        WHERE s.mobile = ?
+        WHERE ${ownerCondition}
         ORDER BY a.submitted_at DESC, a.id DESC
         LIMIT ? OFFSET ?`,
-      args: [mobile, limit, offset],
+      args: [ownerValue, limit, offset],
     }),
   ]);
 
@@ -350,4 +370,22 @@ export async function getUserMocktestAttempts(mobile: string, page: number, limi
     page,
     limit,
   };
+}
+
+export async function guestIdentityExists(guestIdHash: string): Promise<boolean> {
+  const result = await getTursoClient().execute({
+    sql: 'SELECT 1 FROM sessions WHERE guest_id_hash = ? AND mobile IS NULL LIMIT 1',
+    args: [guestIdHash],
+  });
+  return result.rows.length > 0;
+}
+
+export async function linkGuestMocktestSessions(guestIdHash: string, mobile: string, displayName: string) {
+  const result = await getTursoClient().execute({
+    sql: `UPDATE sessions
+      SET mobile = ?, guest_id_hash = NULL, display_name = ?
+      WHERE guest_id_hash = ? AND mobile IS NULL`,
+    args: [mobile, displayName, guestIdHash],
+  });
+  return Number(result.rowsAffected);
 }

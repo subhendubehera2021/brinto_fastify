@@ -3,14 +3,18 @@ import {
   createMockTestSession,
   getMockTestById,
   getUserMocktestAttempts,
+  guestIdentityExists,
+  linkGuestMocktestSessions,
   MocktestsDatabaseConfigurationError,
   MocktestNotFoundError,
   MocktestSubmissionError,
   submitMockTestAttempt,
   type CreateMockTestInput,
+  type MocktestOwner,
   type SubmitMockTestAttemptInput,
 } from './mocktests.dao';
 import { getVerifiedAuthUser, hasRole, type AuthUser } from '../../lib/auth';
+import { createGuestId, hashGuestId, isValidGuestId } from './guest-id';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -82,8 +86,61 @@ function authorizeMocktestUser(request: Request): AuthUser | Response {
   return user;
 }
 
-function isResponse(value: AuthUser | Response): value is Response {
+function isResponse<T>(value: T | Response): value is Response {
   return value instanceof Response;
+}
+
+interface MocktestIdentity {
+  owner: MocktestOwner;
+  displayName: string;
+  guestId?: string;
+  isNewGuest: boolean;
+}
+
+type IdentityResult = MocktestIdentity | Response;
+
+async function resolveMocktestIdentity(request: Request, allowNewGuest = false): Promise<IdentityResult> {
+  const authorization = request.headers.get('authorization') || request.headers.get('x-access-token');
+  if (authorization) {
+    const user = getVerifiedAuthUser(request);
+    if (!user) return jsonResponse({ success: false, error: 'Unauthorized. Token missing or invalid.' }, 401);
+    if (!['USER', 'STUDENT', 'ADMIN'].some((role) => hasRole(user, role))) {
+      return jsonResponse({ success: false, error: 'Forbidden. Student role required.' }, 403);
+    }
+    if (!user.mobile) {
+      return jsonResponse({ success: false, error: 'A verified mobile number is required in the authentication token.' }, 403);
+    }
+    return {
+      owner: { mobile: user.mobile, guestIdHash: null },
+      displayName: user.user_name || user.user_id || user.id,
+      isNewGuest: false,
+    };
+  }
+
+  const guestId = request.headers.get('x-guest-id')?.trim();
+  if (guestId) {
+    if (!isValidGuestId(guestId)) {
+      return jsonResponse({ success: false, error: 'Invalid guest ID.' }, 401);
+    }
+    return {
+      owner: { mobile: null, guestIdHash: await hashGuestId(guestId) },
+      displayName: 'Guest',
+      guestId,
+      isNewGuest: false,
+    };
+  }
+
+  if (!allowNewGuest) {
+    return jsonResponse({ success: false, error: 'Authentication or X-Guest-Id is required.' }, 401);
+  }
+
+  const newGuestId = createGuestId();
+  return {
+    owner: { mobile: null, guestIdHash: await hashGuestId(newGuestId) },
+    displayName: 'Guest',
+    guestId: newGuestId,
+    isNewGuest: true,
+  };
 }
 
 function validateTestId(value: string): number | null {
@@ -158,10 +215,7 @@ export async function createMockTestRequest(request: Request): Promise<Response>
   }
 }
 
-export async function getMockTestRequest(request: Request, rawTestId: string): Promise<Response> {
-  const user = authorizeMocktestUser(request);
-  if (isResponse(user)) return user;
-
+export async function getMockTestRequest(rawTestId: string): Promise<Response> {
   const testId = validateTestId(rawTestId);
   if (testId === null) return jsonResponse({ success: false, error: 'testId must be a positive integer' }, 400);
 
@@ -175,11 +229,8 @@ export async function getMockTestRequest(request: Request, rawTestId: string): P
 }
 
 export async function getMyMocktestAttemptsRequest(request: Request, url: URL): Promise<Response> {
-  const user = authorizeMocktestUser(request);
-  if (isResponse(user)) return user;
-  if (!user.mobile) {
-    return jsonResponse({ success: false, error: 'A verified mobile number is required in the authentication token.' }, 403);
-  }
+  const identity = await resolveMocktestIdentity(request);
+  if (isResponse(identity)) return identity;
 
   const requestedPage = Number(url.searchParams.get('page') || 1);
   const requestedLimit = Number(url.searchParams.get('limit') || 10);
@@ -192,7 +243,7 @@ export async function getMyMocktestAttemptsRequest(request: Request, url: URL): 
 
   const limit = Math.min(requestedLimit, 50);
   try {
-    const result = await getUserMocktestAttempts(user.mobile, requestedPage, limit);
+    const result = await getUserMocktestAttempts(identity.owner, requestedPage, limit);
     return jsonResponse({
       success: true,
       data: result.attempts,
@@ -209,12 +260,6 @@ export async function getMyMocktestAttemptsRequest(request: Request, url: URL): 
 }
 
 export async function createMockTestSessionRequest(request: Request): Promise<Response> {
-  const user = authorizeMocktestUser(request);
-  if (isResponse(user)) return user;
-  if (!user.mobile) {
-    return jsonResponse({ success: false, error: 'A verified mobile number is required in the authentication token.' }, 403);
-  }
-
   let input: unknown;
   try {
     input = await request.json();
@@ -225,20 +270,26 @@ export async function createMockTestSessionRequest(request: Request): Promise<Re
     return jsonResponse({ success: false, error: 'testId must be a positive integer' }, 400);
   }
 
+  const identity = await resolveMocktestIdentity(request, true);
+  if (isResponse(identity)) return identity;
+
   try {
-    const session = await createMockTestSession(user.user_name || user.user_id || user.id, user.mobile, input.testId);
-    return jsonResponse({ success: true, data: session }, 201);
+    if (!identity.isNewGuest && identity.owner.guestIdHash && !(await guestIdentityExists(identity.owner.guestIdHash))) {
+      return jsonResponse({ success: false, error: 'Guest identity not found.' }, 401);
+    }
+    const session = await createMockTestSession(identity.displayName, identity.owner, input.testId);
+    return jsonResponse({
+      success: true,
+      data: { ...session, ...(identity.isNewGuest ? { guestId: identity.guestId } : {}) },
+    }, 201);
   } catch (error) {
     return respondToAttemptError(error);
   }
 }
 
 export async function submitMockTestAttemptRequest(request: Request): Promise<Response> {
-  const user = authorizeMocktestUser(request);
-  if (isResponse(user)) return user;
-  if (!user.mobile) {
-    return jsonResponse({ success: false, error: 'A verified mobile number is required in the authentication token.' }, 403);
-  }
+  const identity = await resolveMocktestIdentity(request);
+  if (isResponse(identity)) return identity;
 
   let input: unknown;
   try {
@@ -251,8 +302,42 @@ export async function submitMockTestAttemptRequest(request: Request): Promise<Re
   if (validationError) return jsonResponse({ success: false, error: validationError }, 400);
 
   try {
-    const result = await submitMockTestAttempt({ ...(input as Omit<SubmitMockTestAttemptInput, 'mobile'>), mobile: user.mobile });
+    const { sessionId, timeTaken, answers } = input as Omit<SubmitMockTestAttemptInput, 'mobile' | 'guestIdHash'>;
+    const result = await submitMockTestAttempt({
+      sessionId,
+      timeTaken,
+      answers,
+      ...identity.owner,
+    });
     return jsonResponse({ success: true, message: 'Mock test attempt submitted successfully', data: result }, 201);
+  } catch (error) {
+    return respondToAttemptError(error);
+  }
+}
+
+export async function linkGuestMocktestSessionsRequest(request: Request): Promise<Response> {
+  const user = getVerifiedAuthUser(request);
+  if (!user) return jsonResponse({ success: false, error: 'Unauthorized. Token missing or invalid.' }, 401);
+  if (!['USER', 'STUDENT', 'ADMIN'].some((role) => hasRole(user, role))) {
+    return jsonResponse({ success: false, error: 'Forbidden. Student role required.' }, 403);
+  }
+  if (!user.mobile) {
+    return jsonResponse({ success: false, error: 'A verified mobile number is required in the authentication token.' }, 403);
+  }
+
+  const guestId = request.headers.get('x-guest-id')?.trim();
+  if (!guestId || !isValidGuestId(guestId)) {
+    return jsonResponse({ success: false, error: 'A valid X-Guest-Id header is required.' }, 400);
+  }
+
+  try {
+    const sessionsLinked = await linkGuestMocktestSessions(
+      await hashGuestId(guestId),
+      user.mobile,
+      user.user_name || user.user_id || user.id
+    );
+    if (sessionsLinked === 0) return jsonResponse({ success: false, error: 'Guest sessions not found.' }, 404);
+    return jsonResponse({ success: true, data: { sessionsLinked } }, 200);
   } catch (error) {
     return respondToAttemptError(error);
   }

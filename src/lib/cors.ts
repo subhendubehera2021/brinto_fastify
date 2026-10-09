@@ -9,7 +9,7 @@ export function getCorsHeaders(requestOrigin: string | null): Record<string, str
     'Access-Control-Allow-Origin': origin,
     'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
     'Access-Control-Allow-Headers':
-      'Authorization, Content-Type, brinto_token, x-access-token, X-Requested-With, Accept, Origin',
+      'Authorization, Content-Type, brinto_token, x-access-token, X-Guest-Id, X-Requested-With, Accept, Origin',
     'Access-Control-Max-Age': '86400',
     'Vary': 'Origin',
   };

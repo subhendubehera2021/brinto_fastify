@@ -4,6 +4,7 @@ import {
   createMockTestSessionRequest,
   getMyMocktestAttemptsRequest,
   getMockTestRequest,
+  linkGuestMocktestSessionsRequest,
   submitMockTestAttemptRequest,
 } from './mocktests.controller';
 
@@ -27,9 +28,13 @@ export async function handleMocktestsRoute(request: Request, url: URL): Promise<
     return await getMyMocktestAttemptsRequest(request, url);
   }
 
+  if (url.pathname === '/api/mocktests/guest/link' && request.method === 'POST') {
+    return await linkGuestMocktestSessionsRequest(request);
+  }
+
   const testMatch = url.pathname.match(/^\/api\/mocktests\/(\d+)$/);
   if (testMatch && request.method === 'GET') {
-    return await getMockTestRequest(request, testMatch[1]);
+    return await getMockTestRequest(testMatch[1]);
   }
 
   return null;

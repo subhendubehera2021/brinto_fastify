@@ -125,7 +125,7 @@ export const openApiSpec = {
         responses: {
           '201': { description: 'Mock test with its questions and options created successfully' },
           '400': { description: 'Invalid request payload' },
-          '401': { description: 'Missing, expired, or invalid authentication token' },
+          '401': { description: 'Missing, expired, or invalid authentication token, or unknown X-Guest-Id' },
           '403': { description: 'Authenticated user does not have the ADMIN role' },
           '500': { description: 'Mock test could not be created' },
           '503': { description: 'Turso configuration is missing' },
@@ -136,7 +136,11 @@ export const openApiSpec = {
       post: {
         tags: ['Mocktests'],
         summary: 'Create Mock Test Session',
-        description: 'Creates a test-specific session for an authenticated USER, STUDENT, or ADMIN. The verified mobile claim from the JWT is stored for user-specific attempt lookup. Submit attempts to POST /api/mocktests/attempts; the test ID is read from this session.',
+        description: 'Creates a test-specific session for a registered user or guest. Registered users are identified by the verified JWT mobile claim. Guests receive a high-entropy guestId that must be stored securely and sent as X-Guest-Id on later requests. Submit attempts to POST /api/mocktests/attempts; the test ID is read from this session.',
+        security: [{ bearerAuth: [] }, {}],
+        parameters: [
+          { name: 'X-Guest-Id', in: 'header', required: false, schema: { type: 'string' }, description: 'Omit on first guest session creation; reuse the returned guestId on later guest requests.' },
+        ],
         requestBody: {
           required: true,
           content: {
@@ -166,6 +170,7 @@ export const openApiSpec = {
                         id: { type: 'string', example: '1eecf518-25a0-4fa5-81dc-3c5a99c86d36' },
                         displayName: { type: 'string', nullable: true, example: 'student01' },
                         testId: { type: 'integer', example: 1 },
+                        guestId: { type: 'string', description: 'Returned only when a new guest identity is created.' },
                         createdAt: { type: 'string', example: '2026-10-09 12:00:00' },
                         lastSeen: { type: 'string', example: '2026-10-09 12:00:00' },
                       },
@@ -176,7 +181,7 @@ export const openApiSpec = {
             },
           },
           '400': { description: 'Invalid JSON or testId' },
-          '401': { description: 'Missing, expired, or invalid authentication token' },
+          '401': { description: 'Invalid authentication token or unknown X-Guest-Id' },
           '403': { description: 'User role is not allowed or the JWT has no mobile claim' },
           '404': { description: 'Mock test not found' },
           '503': { description: 'Turso configuration is missing' },
@@ -188,13 +193,12 @@ export const openApiSpec = {
         tags: ['Mocktests'],
         summary: 'Get Mock Test For Attempt',
         description: 'Returns test questions and options without answer keys or explanations.',
+        security: [],
         parameters: [
           { name: 'testId', in: 'path', required: true, schema: { type: 'integer', minimum: 1 } },
         ],
         responses: {
           '200': { description: 'Test and answer options without correctness data' },
-          '401': { description: 'Missing, expired, or invalid authentication token' },
-          '403': { description: 'User role is not allowed' },
           '404': { description: 'Mock test not found' },
           '503': { description: 'Turso configuration is missing' },
         },
@@ -203,16 +207,18 @@ export const openApiSpec = {
     '/api/mocktests/my-attempts': {
       get: {
         tags: ['Mocktests'],
-        summary: 'Get Current User Mock Test Attempts',
-        description: 'Returns paginated test and result summaries for attempts associated with the verified mobile number in the authenticated JWT.',
+        summary: 'Get Current User or Guest Mock Test Attempts',
+        description: 'Returns paginated test and result summaries for the verified JWT mobile or the guest identity supplied in X-Guest-Id.',
+        security: [{ bearerAuth: [] }, {}],
         parameters: [
           { name: 'page', in: 'query', schema: { type: 'integer', minimum: 1, default: 1 } },
           { name: 'limit', in: 'query', schema: { type: 'integer', minimum: 1, maximum: 50, default: 10 } },
+          { name: 'X-Guest-Id', in: 'header', required: false, schema: { type: 'string' } },
         ],
         responses: {
           '200': { description: 'Paginated attempt history; an empty history returns an empty data array' },
           '400': { description: 'Invalid page or limit query parameter' },
-          '401': { description: 'Missing, expired, or invalid authentication token' },
+          '401': { description: 'Authentication or X-Guest-Id is missing or invalid' },
           '403': { description: 'User role is not allowed or the JWT has no mobile claim' },
           '503': { description: 'Turso configuration is missing' },
         },
@@ -222,7 +228,11 @@ export const openApiSpec = {
       post: {
         tags: ['Mocktests'],
         summary: 'Submit Mock Test Attempt',
-        description: 'Looks up the test ID from the authenticated user session, scores answers on the server, and atomically stores the attempt, answers, and section totals. The session must belong to the authenticated user mobile. Score is the number of correct answers. Questions omitted from answers are counted as skipped.',
+        description: 'Looks up the test ID from the session, verifies session ownership using the authenticated user mobile or X-Guest-Id, scores answers on the server, and atomically stores the attempt, answers, and section totals. Score is the number of correct answers. Questions omitted from answers are counted as skipped.',
+        security: [{ bearerAuth: [] }, {}],
+        parameters: [
+          { name: 'X-Guest-Id', in: 'header', required: false, schema: { type: 'string' } },
+        ],
         requestBody: {
           required: true,
           content: {
@@ -294,9 +304,28 @@ export const openApiSpec = {
             },
           },
           '400': { description: 'Invalid answers, session, or request payload' },
-          '401': { description: 'Missing, expired, or invalid authentication token' },
+          '401': { description: 'Authentication or X-Guest-Id is missing or invalid' },
           '403': { description: 'User role is not allowed or the JWT has no mobile claim' },
           '404': { description: 'Mock test associated with the session not found' },
+          '503': { description: 'Turso configuration is missing' },
+        },
+      },
+    },
+    '/api/mocktests/guest/link': {
+      post: {
+        tags: ['Mocktests'],
+        summary: 'Link Guest Attempts To User Account',
+        description: 'Associates sessions belonging to X-Guest-Id with the authenticated user mobile, preserving guest attempt history after registration or login.',
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          { name: 'X-Guest-Id', in: 'header', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: 'Guest sessions linked to the authenticated user' },
+          '400': { description: 'Invalid guest ID' },
+          '401': { description: 'Missing or invalid authentication token' },
+          '403': { description: 'User role or mobile claim is not allowed' },
+          '404': { description: 'No guest sessions found for this guest ID' },
           '503': { description: 'Turso configuration is missing' },
         },
       },
