@@ -7,6 +7,34 @@ export interface CreatePassageInput {
   test_name: string;
 }
 
+export interface CreatePassageTypingResultInput {
+  session_id: string;
+  passage_id: number;
+  keystrokes_count: number;
+  error_count: number;
+  backspace_count: number;
+  typed_word_count: number;
+}
+
+export interface PassageTypingResult {
+  id: number;
+  session_id: string;
+  passage_id: number;
+  keystrokes_count: number;
+  error_count: number;
+  backspace_count: number;
+  total_word_count: number;
+  typed_word_count: number;
+  pending_word_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+function countWords(text: string): number {
+  const words = text.trim().split(/\s+/).filter(Boolean);
+  return words.length;
+}
+
 export async function createPassage(inputs: CreatePassageInput | CreatePassageInput[]) {
   const passages = Array.isArray(inputs) ? inputs : [inputs];
   const transaction = await getTursoClient().transaction('write');
@@ -65,4 +93,95 @@ export async function getRandomPassage(testName?: string, excludedIds: number[] 
     test_name: String(passage.test_name),
     created_at: passage.created_at,
   };
+}
+
+export async function savePassageTypingResult(input: CreatePassageTypingResultInput): Promise<PassageTypingResult> {
+  const passageResult = await getTursoClient().execute({
+    sql: 'SELECT id, passage_text FROM mocktest_passages WHERE id = ?',
+    args: [input.passage_id],
+  });
+  const passage = passageResult.rows[0];
+  if (!passage) {
+    throw new Error('Passage not found');
+  }
+
+  const totalWordCount = countWords(String(passage.passage_text));
+  if (input.typed_word_count > totalWordCount) {
+    throw new Error('typed_word_count cannot exceed total_word_count');
+  }
+
+  const result = await getTursoClient().execute({
+    sql: `INSERT INTO mocktest_passage_typing_results
+      (session_id, passage_id, keystrokes_count, error_count, backspace_count, total_word_count, typed_word_count)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(session_id, passage_id)
+      DO UPDATE SET
+        keystrokes_count = excluded.keystrokes_count,
+        error_count = excluded.error_count,
+        backspace_count = excluded.backspace_count,
+        total_word_count = excluded.total_word_count,
+        typed_word_count = excluded.typed_word_count,
+        updated_at = CURRENT_TIMESTAMP
+      RETURNING id, session_id, passage_id, keystrokes_count, error_count, backspace_count, total_word_count, typed_word_count, created_at, updated_at`,
+    args: [
+      input.session_id,
+      input.passage_id,
+      input.keystrokes_count,
+      input.error_count,
+      input.backspace_count,
+      totalWordCount,
+      input.typed_word_count,
+    ],
+  });
+
+  const row = result.rows[0];
+  const total = Number(row.total_word_count);
+  const typed = Number(row.typed_word_count);
+
+  return {
+    id: Number(row.id),
+    session_id: String(row.session_id),
+    passage_id: Number(row.passage_id),
+    keystrokes_count: Number(row.keystrokes_count),
+    error_count: Number(row.error_count),
+    backspace_count: Number(row.backspace_count),
+    total_word_count: total,
+    typed_word_count: typed,
+    pending_word_count: Math.max(0, total - typed),
+    created_at: String(row.created_at),
+    updated_at: String(row.updated_at),
+  };
+}
+
+export async function getPassageTypingResultsBySession(sessionId: string, passageId?: number): Promise<PassageTypingResult[]> {
+  const sql = passageId
+    ? `SELECT id, session_id, passage_id, keystrokes_count, error_count, backspace_count, total_word_count, typed_word_count, created_at, updated_at
+       FROM mocktest_passage_typing_results
+       WHERE session_id = ? AND passage_id = ?
+       ORDER BY created_at DESC, id DESC`
+    : `SELECT id, session_id, passage_id, keystrokes_count, error_count, backspace_count, total_word_count, typed_word_count, created_at, updated_at
+       FROM mocktest_passage_typing_results
+       WHERE session_id = ?
+       ORDER BY created_at DESC, id DESC`;
+
+  const args = passageId ? [sessionId, passageId] : [sessionId];
+  const result = await getTursoClient().execute({ sql, args });
+
+  return result.rows.map((row) => {
+    const total = Number(row.total_word_count);
+    const typed = Number(row.typed_word_count);
+    return {
+      id: Number(row.id),
+      session_id: String(row.session_id),
+      passage_id: Number(row.passage_id),
+      keystrokes_count: Number(row.keystrokes_count),
+      error_count: Number(row.error_count),
+      backspace_count: Number(row.backspace_count),
+      total_word_count: total,
+      typed_word_count: typed,
+      pending_word_count: Math.max(0, total - typed),
+      created_at: String(row.created_at),
+      updated_at: String(row.updated_at),
+    };
+  });
 }

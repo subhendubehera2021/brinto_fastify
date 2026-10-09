@@ -138,6 +138,51 @@ export const openApiSpec = {
         },
       },
     },
+    '/api/mocktest-passages/results': {
+      post: {
+        tags: ['Mocktest Passages'],
+        summary: 'Save passage typing result',
+        description: 'Stores a final typing result for a session and passage. The server calculates total_word_count from the passage text and returns pending_word_count; no auth is required when session_id is supplied.',
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['session_id', 'passage_id', 'keystrokes_count', 'error_count', 'backspace_count', 'typed_word_count'],
+                properties: {
+                  session_id: { type: 'string', example: 'typing-session-123' },
+                  passage_id: { type: 'integer', minimum: 1, example: 42 },
+                  keystrokes_count: { type: 'integer', minimum: 0, example: 450 },
+                  error_count: { type: 'integer', minimum: 0, example: 3 },
+                  backspace_count: { type: 'integer', minimum: 0, example: 8 },
+                  typed_word_count: { type: 'integer', minimum: 0, example: 120 },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          '201': { description: 'Typing result saved successfully' },
+          '400': { description: 'Invalid request payload or count values' },
+          '503': { description: 'Turso configuration is missing' },
+        },
+      },
+      get: {
+        tags: ['Mocktest Passages'],
+        summary: 'Get passage typing results for a session',
+        description: 'Returns stored typing results for a session, optionally filtered to one passage.',
+        parameters: [
+          { name: 'session_id', in: 'query', required: true, schema: { type: 'string' }, example: 'typing-session-123' },
+          { name: 'passage_id', in: 'query', required: false, schema: { type: 'integer', minimum: 1 }, example: 42 },
+        ],
+        responses: {
+          '200': { description: 'Typing results for the session' },
+          '400': { description: 'session_id is missing or passage_id is invalid' },
+          '503': { description: 'Turso configuration is missing' },
+        },
+      },
+    },
     '/api/mocktests': {
       post: {
         tags: ['Mocktests'],

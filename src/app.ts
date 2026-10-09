@@ -551,6 +551,9 @@ export function buildApp(): FastifyInstance {
   app.all('/api/mocktest-passages', async (req, reply) => {
     return await dispatchModuleRouter(req, reply, handleMocktestPassageRoute, 'Mocktest passage route not found', 'Internal Mocktest Passage Error');
   });
+  app.all('/api/mocktest-passages/*', async (req, reply) => {
+    return await dispatchModuleRouter(req, reply, handleMocktestPassageRoute, 'Mocktest passage route not found', 'Internal Mocktest Passage Error');
+  });
 
   return app;
 }

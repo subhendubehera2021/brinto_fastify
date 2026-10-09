@@ -425,6 +425,7 @@ export function buildHonoApp() {
   app.all('/api/mocktests', dispatch(handleMocktestsRoute, 'Mocktests route not found'));
   app.all('/api/mocktests/*', dispatch(handleMocktestsRoute, 'Mocktests route not found'));
   app.all('/api/mocktest-passages', dispatch(handleMocktestPassageRoute, 'Mocktest passage route not found'));
+  app.all('/api/mocktest-passages/*', dispatch(handleMocktestPassageRoute, 'Mocktest passage route not found'));
 
   app.onError((err, c) => {
     console.error('Unhandled API Error:', err);

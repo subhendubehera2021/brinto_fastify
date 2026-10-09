@@ -1,5 +1,11 @@
 import { getVerifiedAuthUser, hasRole } from '../../lib/auth';
-import { createPassage, getRandomPassage, TursoDatabaseConfigurationError } from './mocktest_passage.dao';
+import {
+  createPassage,
+  getPassageTypingResultsBySession,
+  getRandomPassage,
+  savePassageTypingResult,
+  TursoDatabaseConfigurationError,
+} from './mocktest_passage.dao';
 
 function jsonResponse(body: unknown, status: number): Response {
   return new Response(JSON.stringify(body), {
@@ -102,5 +108,75 @@ export async function getRandomPassageRequest(url: URL): Promise<Response> {
     }
     console.error('Failed to get mocktest passage:', error);
     return jsonResponse({ success: false, error: 'Failed to get passage' }, 500);
+  }
+}
+
+export async function submitPassageTypingResultRequest(request: Request): Promise<Response> {
+  let input: unknown;
+  try {
+    input = await request.json();
+  } catch {
+    return jsonResponse({ success: false, error: 'Request body must be valid JSON' }, 400);
+  }
+
+  if (!input || typeof input !== 'object' || Array.isArray(input)) {
+    return jsonResponse({ success: false, error: 'Request body must be a JSON object' }, 400);
+  }
+
+  const body = input as Record<string, unknown>;
+  const sessionId = typeof body.session_id === 'string' ? body.session_id.trim() : '';
+  const passageId = Number(body.passage_id);
+  const keystrokesCount = Number(body.keystrokes_count);
+  const errorCount = Number(body.error_count);
+  const backspaceCount = Number(body.backspace_count);
+  const typedWordCount = Number(body.typed_word_count);
+
+  if (!sessionId) return jsonResponse({ success: false, error: 'session_id is required' }, 400);
+  if (!Number.isSafeInteger(passageId) || passageId < 1) return jsonResponse({ success: false, error: 'passage_id must be a positive integer' }, 400);
+  if (!Number.isSafeInteger(keystrokesCount) || keystrokesCount < 0) return jsonResponse({ success: false, error: 'keystrokes_count must be a non-negative integer' }, 400);
+  if (!Number.isSafeInteger(errorCount) || errorCount < 0) return jsonResponse({ success: false, error: 'error_count must be a non-negative integer' }, 400);
+  if (!Number.isSafeInteger(backspaceCount) || backspaceCount < 0) return jsonResponse({ success: false, error: 'backspace_count must be a non-negative integer' }, 400);
+  if (!Number.isSafeInteger(typedWordCount) || typedWordCount < 0) return jsonResponse({ success: false, error: 'typed_word_count must be a non-negative integer' }, 400);
+
+  try {
+    const data = await savePassageTypingResult({
+      session_id: sessionId,
+      passage_id: passageId,
+      keystrokes_count: keystrokesCount,
+      error_count: errorCount,
+      backspace_count: backspaceCount,
+      typed_word_count: typedWordCount,
+    });
+    return jsonResponse({ success: true, message: 'Passage typing result saved successfully', data }, 201);
+  } catch (error) {
+    if (error instanceof TursoDatabaseConfigurationError) {
+      return jsonResponse({ success: false, error: error.message }, 503);
+    }
+    const message = error instanceof Error ? error.message : 'Failed to save passage typing result';
+    return jsonResponse({ success: false, error: message }, 400);
+  }
+}
+
+export async function getPassageTypingResultsRequest(url: URL): Promise<Response> {
+  const sessionId = url.searchParams.get('session_id')?.trim();
+  if (!sessionId) {
+    return jsonResponse({ success: false, error: 'session_id query parameter is required' }, 400);
+  }
+
+  const passageIdParam = url.searchParams.get('passage_id');
+  const passageId = passageIdParam !== null ? Number(passageIdParam) : undefined;
+  if (passageIdParam !== null && (!Number.isSafeInteger(passageId) || passageId! < 1)) {
+    return jsonResponse({ success: false, error: 'passage_id must be a positive integer' }, 400);
+  }
+
+  try {
+    const data = await getPassageTypingResultsBySession(sessionId, passageId);
+    return jsonResponse({ success: true, data }, 200);
+  } catch (error) {
+    if (error instanceof TursoDatabaseConfigurationError) {
+      return jsonResponse({ success: false, error: error.message }, 503);
+    }
+    console.error('Failed to get passage typing results:', error);
+    return jsonResponse({ success: false, error: 'Failed to get passage typing results' }, 500);
   }
 }
