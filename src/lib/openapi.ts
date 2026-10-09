@@ -134,6 +134,81 @@ export const openApiSpec = {
         },
       },
     },
+    '/api/mocktests/sessions': {
+      post: {
+        tags: ['Mocktests'],
+        summary: 'Create Mock Test Session',
+        description: 'Creates a session for an authenticated student. The verified mobile claim from the JWT is stored for user-specific attempt lookup.',
+        responses: {
+          '201': { description: 'Session created successfully' },
+          '401': { description: 'Missing, expired, or invalid authentication token' },
+          '403': { description: 'User does not have a student role or the JWT has no mobile claim' },
+          '503': { description: 'Turso configuration is missing' },
+        },
+      },
+    },
+    '/api/mocktests/{testId}': {
+      get: {
+        tags: ['Mocktests'],
+        summary: 'Get Mock Test For Attempt',
+        description: 'Returns test questions and options without answer keys or explanations.',
+        parameters: [
+          { name: 'testId', in: 'path', required: true, schema: { type: 'integer', minimum: 1 } },
+        ],
+        responses: {
+          '200': { description: 'Test and answer options without correctness data' },
+          '401': { description: 'Missing, expired, or invalid authentication token' },
+          '403': { description: 'User does not have a student role' },
+          '404': { description: 'Mock test not found' },
+          '503': { description: 'Turso configuration is missing' },
+        },
+      },
+    },
+    '/api/mocktests/{testId}/attempts': {
+      post: {
+        tags: ['Mocktests'],
+        summary: 'Submit Mock Test Attempt',
+        description: 'Scores submitted answers on the server and atomically stores the attempt, answers, and section totals. The session must belong to the authenticated user mobile. Score is the number of correct answers. Questions omitted from answers are counted as skipped.',
+        parameters: [
+          { name: 'testId', in: 'path', required: true, schema: { type: 'integer', minimum: 1 } },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['sessionId', 'timeTaken', 'answers'],
+                properties: {
+                  sessionId: { type: 'string', example: '1eecf518-25a0-4fa5-81dc-3c5a99c86d36' },
+                  timeTaken: { type: 'integer', minimum: 0, example: 840 },
+                  answers: {
+                    type: 'array',
+                    items: {
+                      type: 'object',
+                      required: ['questionId', 'selectedOptionId'],
+                      properties: {
+                        questionId: { type: 'integer', minimum: 1, example: 42 },
+                        selectedOptionId: { type: 'integer', nullable: true, minimum: 1, example: 108 },
+                        isMarked: { type: 'boolean', default: false, example: false },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          '201': { description: 'Attempt submitted and scored successfully' },
+          '400': { description: 'Invalid answers, session, or request payload' },
+          '401': { description: 'Missing, expired, or invalid authentication token' },
+          '403': { description: 'User does not have a student role or the JWT has no mobile claim' },
+          '404': { description: 'Mock test not found' },
+          '503': { description: 'Turso configuration is missing' },
+        },
+      },
+    },
     '/': {
       get: {
         tags: ['System'],

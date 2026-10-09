@@ -296,6 +296,7 @@ export function buildApp(): FastifyInstance {
       pathname !== '/api/openapi.json' &&
       pathname !== '/api/health' &&
       pathname !== '/api/mocktests' &&
+      !pathname.startsWith('/api/mocktests/') &&
       pathname !== '/api/get-blog-upload-url'
     ) {
       await connectToDatabase(process.env.MONGODB_URI);

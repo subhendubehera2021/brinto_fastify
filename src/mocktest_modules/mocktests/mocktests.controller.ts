@@ -1,9 +1,15 @@
 import {
   createMockTest,
+  createMockTestSession,
+  getMockTestById,
   MocktestsDatabaseConfigurationError,
+  MocktestNotFoundError,
+  MocktestSubmissionError,
+  submitMockTestAttempt,
   type CreateMockTestInput,
+  type SubmitMockTestAttemptInput,
 } from './mocktests.dao';
-import { getVerifiedAuthUser, hasRole } from '../../lib/auth';
+import { getVerifiedAuthUser, hasRole, type AuthUser } from '../../lib/auth';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -66,6 +72,64 @@ function jsonResponse(body: unknown, status: number): Response {
   });
 }
 
+function authorizeMocktestUser(request: Request): AuthUser | Response {
+  const user = getVerifiedAuthUser(request);
+  if (!user) return jsonResponse({ success: false, error: 'Unauthorized. Token missing or invalid.' }, 401);
+  if (!['USER', 'STUDENT', 'ADMIN'].some((role) => hasRole(user, role))) {
+    return jsonResponse({ success: false, error: 'Forbidden. Student role required.' }, 403);
+  }
+  return user;
+}
+
+function isResponse(value: AuthUser | Response): value is Response {
+  return value instanceof Response;
+}
+
+function validateTestId(value: string): number | null {
+  const testId = Number(value);
+  return Number.isSafeInteger(testId) && testId > 0 ? testId : null;
+}
+
+function validateAttemptInput(value: unknown): string | null {
+  if (!isRecord(value)) return 'Request body must be a JSON object';
+  if (typeof value.sessionId !== 'string' || !value.sessionId.trim()) return 'sessionId is required';
+  if (typeof value.timeTaken !== 'number' || !Number.isSafeInteger(value.timeTaken) || value.timeTaken < 0) {
+    return 'timeTaken must be a non-negative integer';
+  }
+  if (!Array.isArray(value.answers)) return 'answers must be an array';
+
+  for (const [index, answer] of value.answers.entries()) {
+    if (!isRecord(answer)) return `answers[${index}] must be an object`;
+    if (typeof answer.questionId !== 'number' || !Number.isSafeInteger(answer.questionId) || answer.questionId < 1) {
+      return `answers[${index}].questionId must be a positive integer`;
+    }
+    if (
+      answer.selectedOptionId !== null &&
+      (typeof answer.selectedOptionId !== 'number' || !Number.isSafeInteger(answer.selectedOptionId) || answer.selectedOptionId < 1)
+    ) {
+      return `answers[${index}].selectedOptionId must be a positive integer or null`;
+    }
+    if (answer.isMarked !== undefined && typeof answer.isMarked !== 'boolean') {
+      return `answers[${index}].isMarked must be a boolean`;
+    }
+  }
+  return null;
+}
+
+function respondToAttemptError(error: unknown): Response {
+  if (error instanceof MocktestsDatabaseConfigurationError) {
+    return jsonResponse({ success: false, error: error.message }, 503);
+  }
+  if (error instanceof MocktestNotFoundError) {
+    return jsonResponse({ success: false, error: error.message }, 404);
+  }
+  if (error instanceof MocktestSubmissionError) {
+    return jsonResponse({ success: false, error: error.message }, 400);
+  }
+  console.error('Mocktest request failed:', error);
+  return jsonResponse({ success: false, error: 'Mocktest request failed' }, 500);
+}
+
 export async function createMockTestRequest(request: Request): Promise<Response> {
   const user = getVerifiedAuthUser(request);
   if (!user) return jsonResponse({ success: false, error: 'Unauthorized. Token missing or invalid.' }, 401);
@@ -90,5 +154,68 @@ export async function createMockTestRequest(request: Request): Promise<Response>
     }
     console.error('Failed to create mock test:', error);
     return jsonResponse({ success: false, error: 'Failed to create mock test' }, 500);
+  }
+}
+
+export async function getMockTestRequest(request: Request, rawTestId: string): Promise<Response> {
+  const user = authorizeMocktestUser(request);
+  if (isResponse(user)) return user;
+
+  const testId = validateTestId(rawTestId);
+  if (testId === null) return jsonResponse({ success: false, error: 'testId must be a positive integer' }, 400);
+
+  try {
+    const test = await getMockTestById(testId);
+    if (!test) return jsonResponse({ success: false, error: 'Mock test not found' }, 404);
+    return jsonResponse({ success: true, data: test }, 200);
+  } catch (error) {
+    return respondToAttemptError(error);
+  }
+}
+
+export async function createMockTestSessionRequest(request: Request): Promise<Response> {
+  const user = authorizeMocktestUser(request);
+  if (isResponse(user)) return user;
+  if (!user.mobile) {
+    return jsonResponse({ success: false, error: 'A verified mobile number is required in the authentication token.' }, 403);
+  }
+
+  try {
+    const session = await createMockTestSession(user.user_name || user.user_id || user.id, user.mobile);
+    return jsonResponse({ success: true, data: session }, 201);
+  } catch (error) {
+    return respondToAttemptError(error);
+  }
+}
+
+export async function submitMockTestAttemptRequest(request: Request, rawTestId: string): Promise<Response> {
+  const user = authorizeMocktestUser(request);
+  if (isResponse(user)) return user;
+  if (!user.mobile) {
+    return jsonResponse({ success: false, error: 'A verified mobile number is required in the authentication token.' }, 403);
+  }
+
+  const testId = validateTestId(rawTestId);
+  if (testId === null) return jsonResponse({ success: false, error: 'testId must be a positive integer' }, 400);
+
+  let input: unknown;
+  try {
+    input = await request.json();
+  } catch {
+    return jsonResponse({ success: false, error: 'Request body must be valid JSON' }, 400);
+  }
+
+  const validationError = validateAttemptInput(input);
+  if (validationError) return jsonResponse({ success: false, error: validationError }, 400);
+
+  try {
+    const result = await submitMockTestAttempt({
+      ...(input as Omit<SubmitMockTestAttemptInput, 'testId' | 'mobile'>),
+      testId,
+      mobile: user.mobile,
+    });
+    return jsonResponse({ success: true, message: 'Mock test attempt submitted successfully', data: result }, 201);
+  } catch (error) {
+    return respondToAttemptError(error);
   }
 }
