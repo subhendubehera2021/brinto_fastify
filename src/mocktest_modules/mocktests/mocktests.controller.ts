@@ -2,6 +2,7 @@ import {
   createMockTest,
   createMockTestSession,
   getMockTestById,
+  getUserMocktestAttempts,
   MocktestsDatabaseConfigurationError,
   MocktestNotFoundError,
   MocktestSubmissionError,
@@ -168,6 +169,40 @@ export async function getMockTestRequest(request: Request, rawTestId: string): P
     const test = await getMockTestById(testId);
     if (!test) return jsonResponse({ success: false, error: 'Mock test not found' }, 404);
     return jsonResponse({ success: true, data: test }, 200);
+  } catch (error) {
+    return respondToAttemptError(error);
+  }
+}
+
+export async function getMyMocktestAttemptsRequest(request: Request, url: URL): Promise<Response> {
+  const user = authorizeMocktestUser(request);
+  if (isResponse(user)) return user;
+  if (!user.mobile) {
+    return jsonResponse({ success: false, error: 'A verified mobile number is required in the authentication token.' }, 403);
+  }
+
+  const requestedPage = Number(url.searchParams.get('page') || 1);
+  const requestedLimit = Number(url.searchParams.get('limit') || 10);
+  if (!Number.isSafeInteger(requestedPage) || requestedPage < 1) {
+    return jsonResponse({ success: false, error: 'page must be a positive integer' }, 400);
+  }
+  if (!Number.isSafeInteger(requestedLimit) || requestedLimit < 1) {
+    return jsonResponse({ success: false, error: 'limit must be a positive integer' }, 400);
+  }
+
+  const limit = Math.min(requestedLimit, 50);
+  try {
+    const result = await getUserMocktestAttempts(user.mobile, requestedPage, limit);
+    return jsonResponse({
+      success: true,
+      data: result.attempts,
+      pagination: {
+        total: result.total,
+        page: result.page,
+        limit: result.limit,
+        totalPages: Math.ceil(result.total / result.limit),
+      },
+    }, 200);
   } catch (error) {
     return respondToAttemptError(error);
   }

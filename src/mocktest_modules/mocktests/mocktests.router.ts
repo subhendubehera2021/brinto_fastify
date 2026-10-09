@@ -2,6 +2,7 @@ import { handleCorsPreflight } from '../../lib/cors';
 import {
   createMockTestRequest,
   createMockTestSessionRequest,
+  getMyMocktestAttemptsRequest,
   getMockTestRequest,
   submitMockTestAttemptRequest,
 } from './mocktests.controller';
@@ -20,6 +21,10 @@ export async function handleMocktestsRoute(request: Request, url: URL): Promise<
 
   if (url.pathname === '/api/mocktests/attempts' && request.method === 'POST') {
     return await submitMockTestAttemptRequest(request);
+  }
+
+  if (url.pathname === '/api/mocktests/my-attempts' && request.method === 'GET') {
+    return await getMyMocktestAttemptsRequest(request, url);
   }
 
   const testMatch = url.pathname.match(/^\/api\/mocktests\/(\d+)$/);

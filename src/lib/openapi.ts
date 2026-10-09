@@ -202,6 +202,24 @@ export const openApiSpec = {
         },
       },
     },
+    '/api/mocktests/my-attempts': {
+      get: {
+        tags: ['Mocktests'],
+        summary: 'Get Current User Mock Test Attempts',
+        description: 'Returns paginated test and result summaries for attempts associated with the verified mobile number in the authenticated JWT.',
+        parameters: [
+          { name: 'page', in: 'query', schema: { type: 'integer', minimum: 1, default: 1 } },
+          { name: 'limit', in: 'query', schema: { type: 'integer', minimum: 1, maximum: 50, default: 10 } },
+        ],
+        responses: {
+          '200': { description: 'Paginated attempt history; an empty history returns an empty data array' },
+          '400': { description: 'Invalid page or limit query parameter' },
+          '401': { description: 'Missing, expired, or invalid authentication token' },
+          '403': { description: 'User role is not allowed or the JWT has no mobile claim' },
+          '503': { description: 'Turso configuration is missing' },
+        },
+      },
+    },
     '/api/mocktests/attempts': {
       post: {
         tags: ['Mocktests'],

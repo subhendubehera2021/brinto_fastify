@@ -311,3 +311,51 @@ export async function submitMockTestAttempt(input: SubmitMockTestAttemptInput) {
     throw error;
   }
 }
+
+export async function getUserMocktestAttempts(mobile: string, page: number, limit: number) {
+  const client = getTursoClient();
+  const offset = (page - 1) * limit;
+  const [countResult, attemptsResult] = await Promise.all([
+    client.execute({
+      sql: `SELECT COUNT(*) AS total
+        FROM attempts a
+        INNER JOIN sessions s ON s.id = a.session_id
+        WHERE s.mobile = ?`,
+      args: [mobile],
+    }),
+    client.execute({
+      sql: `SELECT a.id AS attempt_id, a.test_id, t.title, t.exam, t.slug, t.href,
+          a.score, a.correct, a.wrong, a.skipped, a.marked, a.time_taken,
+          a.total_questions, a.submitted_at
+        FROM attempts a
+        INNER JOIN sessions s ON s.id = a.session_id
+        INNER JOIN tests t ON t.id = a.test_id
+        WHERE s.mobile = ?
+        ORDER BY a.submitted_at DESC, a.id DESC
+        LIMIT ? OFFSET ?`,
+      args: [mobile, limit, offset],
+    }),
+  ]);
+
+  return {
+    attempts: attemptsResult.rows.map((row) => ({
+      attemptId: Number(row.attempt_id),
+      testId: Number(row.test_id),
+      title: String(row.title),
+      exam: String(row.exam),
+      slug: String(row.slug),
+      href: String(row.href),
+      score: Number(row.score),
+      correct: Number(row.correct),
+      wrong: Number(row.wrong),
+      skipped: Number(row.skipped),
+      marked: Number(row.marked),
+      timeTaken: Number(row.time_taken),
+      totalQuestions: Number(row.total_questions),
+      submittedAt: row.submitted_at,
+    })),
+    total: Number(countResult.rows[0]?.total ?? 0),
+    page,
+    limit,
+  };
+}
