@@ -19,6 +19,7 @@ import { handleOrderAdditionalDocsRoute } from './modules/order-additional-docs/
 import { handleFieldValuesRoute } from './modules/field-values/field-values.router';
 import { handleStoreOwnersRoute } from './modules/store-owners/store-owners.router';
 import { handleMocktestsRoute } from './mocktest_modules/mocktests/mocktests.router';
+import { handleMocktestPassageRoute } from './mocktest_modules/mocktest_passage/mocktest_passage.router';
 
 const publicDir = path.resolve(process.cwd(), 'public');
 
@@ -128,7 +129,8 @@ export function buildHonoApp() {
       pathname.startsWith('/api/') &&
       pathname !== '/api/health' &&
       pathname !== '/api/openapi.json' &&
-      pathname !== '/api/mocktests/my-attempts'
+      pathname !== '/api/mocktests/my-attempts' &&
+      pathname !== '/api/mocktest-passages'
     ) {
       try {
         cfCache = (caches as any).default as Cache;
@@ -155,6 +157,7 @@ export function buildHonoApp() {
         pathname !== '/api/health' &&
         pathname !== '/api/mocktests' &&
         !pathname.startsWith('/api/mocktests/') &&
+        !pathname.startsWith('/api/mocktest-passages') &&
         pathname !== '/api/get-blog-upload-url'
       ) {
         await connectToDatabase(process.env.MONGODB_URI);
@@ -188,7 +191,7 @@ export function buildHonoApp() {
       c.header(key, val);
     }
     if (!c.res.headers.has('cache-control')) {
-      if (pathname === '/api/mocktests/my-attempts') {
+      if (pathname === '/api/mocktests/my-attempts' || pathname === '/api/mocktest-passages') {
         c.header('Cache-Control', 'private, no-store, no-cache, must-revalidate, max-age=0');
       } else if (c.req.method === 'GET' && pathname.startsWith('/api/') && pathname !== '/api/health') {
         c.header('Cache-Control', 'public, max-age=30, s-maxage=30, stale-while-revalidate=60');
@@ -421,6 +424,7 @@ export function buildHonoApp() {
 
   app.all('/api/mocktests', dispatch(handleMocktestsRoute, 'Mocktests route not found'));
   app.all('/api/mocktests/*', dispatch(handleMocktestsRoute, 'Mocktests route not found'));
+  app.all('/api/mocktest-passages', dispatch(handleMocktestPassageRoute, 'Mocktest passage route not found'));
 
   app.onError((err, c) => {
     console.error('Unhandled API Error:', err);

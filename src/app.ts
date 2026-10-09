@@ -19,6 +19,7 @@ import { handleOrderAdditionalDocsRoute } from './modules/order-additional-docs/
 import { handleFieldValuesRoute } from './modules/field-values/field-values.router';
 import { handleStoreOwnersRoute } from './modules/store-owners/store-owners.router';
 import { handleMocktestsRoute } from './mocktest_modules/mocktests/mocktests.router';
+import { handleMocktestPassageRoute } from './mocktest_modules/mocktest_passage/mocktest_passage.router';
 
 const publicDir = path.resolve(process.cwd(), 'public');
 
@@ -297,6 +298,7 @@ export function buildApp(): FastifyInstance {
       pathname !== '/api/health' &&
       pathname !== '/api/mocktests' &&
       !pathname.startsWith('/api/mocktests/') &&
+      !pathname.startsWith('/api/mocktest-passages') &&
       pathname !== '/api/get-blog-upload-url'
     ) {
       await connectToDatabase(process.env.MONGODB_URI);
@@ -545,6 +547,9 @@ export function buildApp(): FastifyInstance {
   });
   app.all('/api/mocktests/*', async (req, reply) => {
     return await dispatchModuleRouter(req, reply, handleMocktestsRoute, 'Mocktests route not found', 'Internal Mocktests Error');
+  });
+  app.all('/api/mocktest-passages', async (req, reply) => {
+    return await dispatchModuleRouter(req, reply, handleMocktestPassageRoute, 'Mocktest passage route not found', 'Internal Mocktest Passage Error');
   });
 
   return app;

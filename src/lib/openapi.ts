@@ -71,8 +71,56 @@ export const openApiSpec = {
       name: 'Mocktests',
       description: 'Mock test, question, and answer option management',
     },
+    {
+      name: 'Mocktest Passages',
+      description: 'Passage management and random passage selection for mocktests',
+    },
   ],
   paths: {
+    '/api/mocktest-passages': {
+      get: {
+        tags: ['Mocktest Passages'],
+        summary: 'Get a Random Passage',
+        description: 'Returns one random passage, optionally filtered by exact test_name. Responses are not shared-cached so repeated requests can return different passages.',
+        security: [],
+        parameters: [
+          { name: 'test_name', in: 'query', required: false, schema: { type: 'string' }, example: 'SSC CGL' },
+        ],
+        responses: {
+          '200': { description: 'One random matching passage' },
+          '400': { description: 'test_name was empty' },
+          '404': { description: 'No matching passage exists' },
+          '503': { description: 'Turso configuration is missing' },
+        },
+      },
+      post: {
+        tags: ['Mocktest Passages'],
+        summary: 'Create a Passage',
+        description: 'Creates a passage associated with a test name. Admin authentication is required.',
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['passage_text', 'test_name'],
+                properties: {
+                  passage_text: { type: 'string', example: 'Read the passage carefully and answer the following questions.' },
+                  test_name: { type: 'string', example: 'SSC CGL' },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          '201': { description: 'Passage created successfully' },
+          '400': { description: 'Invalid passage payload' },
+          '401': { description: 'Missing or invalid authentication token' },
+          '403': { description: 'Admin role required' },
+          '503': { description: 'Turso configuration is missing' },
+        },
+      },
+    },
     '/api/mocktests': {
       post: {
         tags: ['Mocktests'],
