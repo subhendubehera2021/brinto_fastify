@@ -67,8 +67,71 @@ export const openApiSpec = {
       name: 'Store Owners',
       description: 'Store management, store forms, and subscriptions',
     },
+    {
+      name: 'Mocktests',
+      description: 'Mock test, question, and answer option management',
+    },
   ],
   paths: {
+    '/api/mocktests': {
+      post: {
+        tags: ['Mocktests'],
+        summary: 'Create Mock Test',
+        description: 'Creates a mock test and its questions and answer options in one Turso transaction. The tests.questions count is derived from the questions array.',
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['title', 'exam', 'href', 'slug', 'questions'],
+                properties: {
+                  title: { type: 'string', maxLength: 255, example: 'General Aptitude Mock Test 1' },
+                  exam: { type: 'string', maxLength: 100, example: 'SSC CGL' },
+                  duration: { type: 'integer', minimum: 0, default: 0, example: 60 },
+                  difficulty: { type: 'string', maxLength: 20, default: 'Medium', example: 'Medium' },
+                  attempts: { type: 'integer', minimum: 0, default: 0, example: 0 },
+                  rating: { type: 'number', minimum: 0, default: 0, example: 0 },
+                  href: { type: 'string', maxLength: 255, example: '/mocktests/ssc-cgl-1' },
+                  slug: { type: 'string', maxLength: 255, example: 'ssc-cgl-1' },
+                  is_new: { type: 'boolean', default: false, example: true },
+                  is_free: { type: 'boolean', default: true, example: true },
+                  questions: {
+                    type: 'array',
+                    items: {
+                      type: 'object',
+                      required: ['section', 'text', 'options'],
+                      properties: {
+                        section: { type: 'string', maxLength: 100, example: 'Quantitative Aptitude' },
+                        text: { type: 'string', example: 'What is 12 multiplied by 8?' },
+                        explanation: { type: 'string', nullable: true, example: '12 x 8 = 96.' },
+                        options: {
+                          type: 'array',
+                          items: {
+                            type: 'object',
+                            required: ['text'],
+                            properties: {
+                              text: { type: 'string', maxLength: 500, example: '96' },
+                              is_correct: { type: 'boolean', default: false, example: true },
+                            },
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          '201': { description: 'Mock test with its questions and options created successfully' },
+          '400': { description: 'Invalid request payload' },
+          '500': { description: 'Mock test could not be created' },
+          '503': { description: 'Turso configuration is missing' },
+        },
+      },
+    },
     '/': {
       get: {
         tags: ['System'],

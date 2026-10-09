@@ -18,6 +18,7 @@ import { handlePaymentsRoute } from './modules/payments/payments.router';
 import { handleOrderAdditionalDocsRoute } from './modules/order-additional-docs/order-additional-docs.router';
 import { handleFieldValuesRoute } from './modules/field-values/field-values.router';
 import { handleStoreOwnersRoute } from './modules/store-owners/store-owners.router';
+import { handleMocktestsRoute } from './mocktests/mocktests.router';
 
 const publicDir = path.resolve(process.cwd(), 'public');
 
@@ -294,6 +295,7 @@ export function buildApp(): FastifyInstance {
       pathname.startsWith('/api/') &&
       pathname !== '/api/openapi.json' &&
       pathname !== '/api/health' &&
+      pathname !== '/api/mocktests' &&
       pathname !== '/api/get-blog-upload-url'
     ) {
       await connectToDatabase(process.env.MONGODB_URI);
@@ -535,6 +537,13 @@ export function buildApp(): FastifyInstance {
       'Store owner route not found',
       'Internal Store Owner Error'
     );
+  });
+
+  app.all('/api/mocktests', async (req, reply) => {
+    return await dispatchModuleRouter(req, reply, handleMocktestsRoute, 'Mocktests route not found', 'Internal Mocktests Error');
+  });
+  app.all('/api/mocktests/*', async (req, reply) => {
+    return await dispatchModuleRouter(req, reply, handleMocktestsRoute, 'Mocktests route not found', 'Internal Mocktests Error');
   });
 
   return app;
