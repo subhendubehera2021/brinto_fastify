@@ -3,6 +3,7 @@ import {
   MocktestsDatabaseConfigurationError,
   type CreateMockTestInput,
 } from './mocktests.dao';
+import { getVerifiedAuthUser, hasRole } from '../../lib/auth';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -66,6 +67,10 @@ function jsonResponse(body: unknown, status: number): Response {
 }
 
 export async function createMockTestRequest(request: Request): Promise<Response> {
+  const user = getVerifiedAuthUser(request);
+  if (!user) return jsonResponse({ success: false, error: 'Unauthorized. Token missing or invalid.' }, 401);
+  if (!hasRole(user, 'ADMIN')) return jsonResponse({ success: false, error: 'Forbidden. Admin role required.' }, 403);
+
   let input: unknown;
   try {
     input = await request.json();

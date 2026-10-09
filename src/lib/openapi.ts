@@ -127,6 +127,8 @@ export const openApiSpec = {
         responses: {
           '201': { description: 'Mock test with its questions and options created successfully' },
           '400': { description: 'Invalid request payload' },
+          '401': { description: 'Missing, expired, or invalid authentication token' },
+          '403': { description: 'Authenticated user does not have the ADMIN role' },
           '500': { description: 'Mock test could not be created' },
           '503': { description: 'Turso configuration is missing' },
         },
