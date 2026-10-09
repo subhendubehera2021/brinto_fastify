@@ -215,9 +215,10 @@ export async function getPassageTypingResultsRequest(request: Request, url: URL)
   const owner = await resolveTypingResultOwner(request);
   if (isResponse(owner)) return owner;
 
-  const sessionId = url.searchParams.get('session_id')?.trim();
-  if (!sessionId) {
-    return jsonResponse({ success: false, error: 'session_id query parameter is required' }, 400);
+  const rawSessionId = url.searchParams.get('session_id');
+  const sessionId = rawSessionId?.trim();
+  if (rawSessionId !== null && !sessionId) {
+    return jsonResponse({ success: false, error: 'session_id cannot be empty when provided' }, 400);
   }
 
   const passageIdParam = url.searchParams.get('passage_id');

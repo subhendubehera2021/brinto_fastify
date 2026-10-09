@@ -171,7 +171,7 @@ export async function savePassageTypingResult(input: CreatePassageTypingResultIn
 }
 
 export async function getPassageTypingResultsBySession(
-  sessionId: string,
+  sessionId: string | undefined,
   owner: MocktestOwner,
   passageId?: number
 ): Promise<PassageTypingResult[]> {
@@ -183,18 +183,23 @@ export async function getPassageTypingResultsBySession(
     ? 'mobile = ? AND guest_id_hash IS NULL'
     : 'guest_id_hash = ? AND mobile IS NULL';
   const ownerValue = owner.mobile || owner.guestIdHash!;
-  const sql = passageId
-    ? `SELECT id, session_id, passage_id, keystrokes_count, error_count, backspace_count, total_word_count, typed_word_count, created_at, updated_at
-       FROM mocktest_passage_typing_results
-       WHERE session_id = ? AND passage_id = ? AND ${ownerCondition}
-       ORDER BY created_at DESC, id DESC`
-    : `SELECT id, session_id, passage_id, keystrokes_count, error_count, backspace_count, total_word_count, typed_word_count, created_at, updated_at
-       FROM mocktest_passage_typing_results
-       WHERE session_id = ? AND ${ownerCondition}
-       ORDER BY created_at DESC, id DESC`;
-
-  const args = passageId ? [sessionId, passageId, ownerValue] : [sessionId, ownerValue];
-  const result = await getTursoClient().execute({ sql, args });
+  const conditions = [ownerCondition];
+  const args: Array<string | number> = [ownerValue];
+  if (sessionId !== undefined) {
+    conditions.push('session_id = ?');
+    args.push(sessionId);
+  }
+  if (passageId !== undefined) {
+    conditions.push('passage_id = ?');
+    args.push(passageId);
+  }
+  const result = await getTursoClient().execute({
+    sql: `SELECT id, session_id, passage_id, keystrokes_count, error_count, backspace_count, total_word_count, typed_word_count, created_at, updated_at
+      FROM mocktest_passage_typing_results
+      WHERE ${conditions.join(' AND ')}
+      ORDER BY created_at DESC, id DESC`,
+    args,
+  });
 
   return result.rows.map((row) => {
     const total = Number(row.total_word_count);

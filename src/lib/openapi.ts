@@ -178,17 +178,17 @@ export const openApiSpec = {
       },
       get: {
         tags: ['Mocktest Passages'],
-        summary: 'Get passage typing results for a session',
-        description: 'Returns typing results for a session owned by the verified JWT mobile or the guest identified by X-Guest-Id, optionally filtered to one passage.',
+        summary: 'Get passage typing results',
+        description: 'Returns all typing results owned by the verified JWT mobile or the guest identified by X-Guest-Id. Optionally filter by session_id and/or passage_id.',
         security: [{ bearerAuth: [] }, {}],
         parameters: [
-          { name: 'session_id', in: 'query', required: true, schema: { type: 'string' }, example: 'typing-session-123' },
+          { name: 'session_id', in: 'query', required: false, schema: { type: 'string' }, example: 'typing-session-123' },
           { name: 'passage_id', in: 'query', required: false, schema: { type: 'integer', minimum: 1 }, example: 42 },
           { name: 'X-Guest-Id', in: 'header', required: false, schema: { type: 'string' }, description: 'Required for guest requests. Send the same guest ID used when saving the result.' },
         ],
         responses: {
-          '200': { description: 'Typing results for the session' },
-          '400': { description: 'session_id is missing or passage_id is invalid' },
+          '200': { description: 'Typing results belonging to the authenticated user or guest' },
+          '400': { description: 'session_id is empty or passage_id is invalid' },
           '401': { description: 'Valid JWT or X-Guest-Id is required' },
           '403': { description: 'User role is not allowed or the JWT has no mobile claim' },
           '503': { description: 'Turso configuration is missing' },
