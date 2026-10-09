@@ -95,25 +95,41 @@ export const openApiSpec = {
       },
       post: {
         tags: ['Mocktest Passages'],
-        summary: 'Create a Passage',
-        description: 'Creates a passage associated with a test name. Admin authentication is required.',
+        summary: 'Create Passage(s)',
+        description: 'Creates one passage or an array of passages associated with test names. Array creation is atomic. Admin authentication is required.',
         requestBody: {
           required: true,
           content: {
             'application/json': {
               schema: {
-                type: 'object',
-                required: ['passage_text', 'test_name'],
-                properties: {
-                  passage_text: { type: 'string', example: 'Read the passage carefully and answer the following questions.' },
-                  test_name: { type: 'string', example: 'SSC CGL' },
-                },
+                oneOf: [
+                  {
+                    type: 'object',
+                    required: ['passage_text', 'test_name'],
+                    properties: {
+                      passage_text: { type: 'string', example: 'Read the passage carefully and answer the following questions.' },
+                      test_name: { type: 'string', example: 'SSC CGL' },
+                    },
+                  },
+                  {
+                    type: 'array',
+                    minItems: 1,
+                    items: {
+                      type: 'object',
+                      required: ['passage_text', 'test_name'],
+                      properties: {
+                        passage_text: { type: 'string' },
+                        test_name: { type: 'string' },
+                      },
+                    },
+                  },
+                ],
               },
             },
           },
         },
         responses: {
-          '201': { description: 'Passage created successfully' },
+          '201': { description: 'Passage or passages created successfully' },
           '400': { description: 'Invalid passage payload' },
           '401': { description: 'Missing or invalid authentication token' },
           '403': { description: 'Admin role required' },

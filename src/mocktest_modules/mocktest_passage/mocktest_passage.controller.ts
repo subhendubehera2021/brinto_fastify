@@ -20,24 +20,52 @@ export async function createPassageRequest(request: Request): Promise<Response> 
     return jsonResponse({ success: false, error: 'Request body must be valid JSON' }, 400);
   }
 
-  if (!input || typeof input !== 'object' || Array.isArray(input)) {
-    return jsonResponse({ success: false, error: 'Request body must be a JSON object' }, 400);
+  const entries: unknown[] = Array.isArray(input) ? input : [input];
+  const isBatch = Array.isArray(input);
+  if (entries.length === 0) {
+    return jsonResponse({ success: false, error: 'Request array must contain at least one passage' }, 400);
   }
 
-  const body = input as Record<string, unknown>;
-  if (typeof body.passage_text !== 'string' || !body.passage_text.trim()) {
-    return jsonResponse({ success: false, error: 'passage_text is required and must be non-empty' }, 400);
-  }
-  if (typeof body.test_name !== 'string' || !body.test_name.trim()) {
-    return jsonResponse({ success: false, error: 'test_name is required and must be non-empty' }, 400);
-  }
+  const passages: Array<{ passage_text: string; test_name: string }> = [];
+  for (const [index, entry] of entries.entries()) {
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
+      return jsonResponse({
+        success: false,
+        error: isBatch ? `passages[${index}] must be a JSON object` : 'Request body must be a JSON object',
+      }, 400);
+    }
 
-  try {
-    const data = await createPassage({
+    const body = entry as Record<string, unknown>;
+    if (typeof body.passage_text !== 'string' || !body.passage_text.trim()) {
+      return jsonResponse({
+        success: false,
+        error: isBatch
+          ? `passages[${index}].passage_text is required and must be non-empty`
+          : 'passage_text is required and must be non-empty',
+      }, 400);
+    }
+    if (typeof body.test_name !== 'string' || !body.test_name.trim()) {
+      return jsonResponse({
+        success: false,
+        error: isBatch
+          ? `passages[${index}].test_name is required and must be non-empty`
+          : 'test_name is required and must be non-empty',
+      }, 400);
+    }
+
+    passages.push({
       passage_text: body.passage_text,
       test_name: body.test_name.trim(),
     });
-    return jsonResponse({ success: true, message: 'Passage created successfully', data }, 201);
+  }
+
+  try {
+    const data = await createPassage(isBatch ? passages : passages[0]);
+    return jsonResponse({
+      success: true,
+      message: isBatch ? 'Passages created successfully' : 'Passage created successfully',
+      data,
+    }, 201);
   } catch (error) {
     if (error instanceof TursoDatabaseConfigurationError) {
       return jsonResponse({ success: false, error: error.message }, 503);
