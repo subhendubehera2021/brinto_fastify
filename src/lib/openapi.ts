@@ -138,7 +138,7 @@ export const openApiSpec = {
       post: {
         tags: ['Mocktests'],
         summary: 'Create Mock Test Session',
-        description: 'Creates a test-specific session for an authenticated student. The verified mobile claim from the JWT is stored for user-specific attempt lookup.',
+        description: 'Creates a test-specific session for an authenticated USER, STUDENT, or ADMIN. The verified mobile claim from the JWT is stored for user-specific attempt lookup. Submit attempts to POST /api/mocktests/attempts; the test ID is read from this session.',
         requestBody: {
           required: true,
           content: {
@@ -154,9 +154,33 @@ export const openApiSpec = {
           },
         },
         responses: {
-          '201': { description: 'Session created successfully' },
+          '201': {
+            description: 'Session created successfully',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    success: { type: 'boolean', example: true },
+                    data: {
+                      type: 'object',
+                      properties: {
+                        id: { type: 'string', example: '1eecf518-25a0-4fa5-81dc-3c5a99c86d36' },
+                        displayName: { type: 'string', nullable: true, example: 'student01' },
+                        testId: { type: 'integer', example: 1 },
+                        createdAt: { type: 'string', example: '2026-10-09 12:00:00' },
+                        lastSeen: { type: 'string', example: '2026-10-09 12:00:00' },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          '400': { description: 'Invalid JSON or testId' },
           '401': { description: 'Missing, expired, or invalid authentication token' },
-          '403': { description: 'User does not have a student role or the JWT has no mobile claim' },
+          '403': { description: 'User role is not allowed or the JWT has no mobile claim' },
+          '404': { description: 'Mock test not found' },
           '503': { description: 'Turso configuration is missing' },
         },
       },
@@ -172,7 +196,7 @@ export const openApiSpec = {
         responses: {
           '200': { description: 'Test and answer options without correctness data' },
           '401': { description: 'Missing, expired, or invalid authentication token' },
-          '403': { description: 'User does not have a student role' },
+          '403': { description: 'User role is not allowed' },
           '404': { description: 'Mock test not found' },
           '503': { description: 'Turso configuration is missing' },
         },
@@ -182,7 +206,7 @@ export const openApiSpec = {
       post: {
         tags: ['Mocktests'],
         summary: 'Submit Mock Test Attempt',
-        description: 'Looks up the test from the authenticated user session, scores answers on the server, and atomically stores the attempt, answers, and section totals. The session must belong to the authenticated user mobile. Score is the number of correct answers. Questions omitted from answers are counted as skipped.',
+        description: 'Looks up the test ID from the authenticated user session, scores answers on the server, and atomically stores the attempt, answers, and section totals. The session must belong to the authenticated user mobile. Score is the number of correct answers. Questions omitted from answers are counted as skipped.',
         requestBody: {
           required: true,
           content: {
@@ -211,11 +235,52 @@ export const openApiSpec = {
           },
         },
         responses: {
-          '201': { description: 'Attempt submitted and scored successfully' },
+          '201': {
+            description: 'Attempt submitted and scored successfully',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    success: { type: 'boolean', example: true },
+                    message: { type: 'string', example: 'Mock test attempt submitted successfully' },
+                    data: {
+                      type: 'object',
+                      properties: {
+                        id: { type: 'integer', example: 12 },
+                        testId: { type: 'integer', example: 1 },
+                        score: { type: 'integer', description: 'Number of correct answers', example: 8 },
+                        correct: { type: 'integer', example: 8 },
+                        wrong: { type: 'integer', example: 1 },
+                        skipped: { type: 'integer', example: 1 },
+                        marked: { type: 'integer', example: 2 },
+                        timeTaken: { type: 'integer', example: 840 },
+                        totalQuestions: { type: 'integer', example: 10 },
+                        submittedAt: { type: 'string', example: '2026-10-09 12:15:00' },
+                        sections: {
+                          type: 'array',
+                          items: {
+                            type: 'object',
+                            properties: {
+                              sectionName: { type: 'string', example: 'Quantitative Aptitude' },
+                              correct: { type: 'integer', example: 4 },
+                              wrong: { type: 'integer', example: 1 },
+                              skipped: { type: 'integer', example: 0 },
+                              total: { type: 'integer', example: 5 },
+                            },
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
           '400': { description: 'Invalid answers, session, or request payload' },
           '401': { description: 'Missing, expired, or invalid authentication token' },
-          '403': { description: 'User does not have a student role or the JWT has no mobile claim' },
-          '404': { description: 'Mock test not found' },
+          '403': { description: 'User role is not allowed or the JWT has no mobile claim' },
+          '404': { description: 'Mock test associated with the session not found' },
           '503': { description: 'Turso configuration is missing' },
         },
       },
