@@ -1,0 +1,3 @@
+DROP INDEX IF EXISTS idx_tests_slug;
+ALTER TABLE tests DROP COLUMN slug;
+ALTER TABLE tests DROP COLUMN href;

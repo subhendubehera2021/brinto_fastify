@@ -9,8 +9,6 @@ export interface CreateMockTestInput {
   difficulty?: string;
   attempts?: number;
   rating?: number;
-  href: string;
-  slug: string;
   is_new?: boolean;
   is_free?: boolean;
   questions: Array<{
@@ -45,8 +43,8 @@ export async function createMockTest(input: CreateMockTestInput) {
   try {
     const testResult = await transaction.execute({
       sql: `INSERT INTO tests
-        (title, exam, questions, duration, difficulty, attempts, rating, href, slug, is_new, is_free)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        (title, exam, questions, duration, difficulty, attempts, rating, is_new, is_free)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         RETURNING id`,
       args: [
         input.title,
@@ -56,8 +54,6 @@ export async function createMockTest(input: CreateMockTestInput) {
         input.difficulty ?? 'Medium',
         input.attempts ?? 0,
         input.rating ?? 0,
-        input.href,
-        input.slug,
         input.is_new ? 1 : 0,
         input.is_free === false ? 0 : 1,
       ],
@@ -90,7 +86,7 @@ export async function createMockTest(input: CreateMockTestInput) {
 export async function getMockTestById(testId: number) {
   const client = getTursoClient();
   const testResult = await client.execute({
-    sql: `SELECT id, title, exam, questions, duration, difficulty, href, slug, is_new, is_free
+    sql: `SELECT id, title, exam, questions, duration, difficulty, is_new, is_free
       FROM tests WHERE id = ?`,
     args: [testId],
   });
@@ -137,8 +133,6 @@ export async function getMockTestById(testId: number) {
     questions: [...questions.values()],
     duration: Number(test.duration),
     difficulty: String(test.difficulty),
-    href: String(test.href),
-    slug: String(test.slug),
     is_new: Boolean(Number(test.is_new)),
     is_free: Boolean(Number(test.is_free)),
   };
@@ -324,7 +318,7 @@ export async function getUserMocktestAttempts(mobile: string, page: number, limi
       args: [mobile],
     }),
     client.execute({
-      sql: `SELECT a.id AS attempt_id, a.test_id, t.title, t.exam, t.slug, t.href,
+      sql: `SELECT a.id AS attempt_id, a.test_id, t.title, t.exam,
           a.score, a.correct, a.wrong, a.skipped, a.marked, a.time_taken,
           a.total_questions, a.submitted_at
         FROM attempts a
@@ -343,8 +337,6 @@ export async function getUserMocktestAttempts(mobile: string, page: number, limi
       testId: Number(row.test_id),
       title: String(row.title),
       exam: String(row.exam),
-      slug: String(row.slug),
-      href: String(row.href),
       score: Number(row.score),
       correct: Number(row.correct),
       wrong: Number(row.wrong),

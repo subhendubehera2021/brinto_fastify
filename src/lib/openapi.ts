@@ -84,7 +84,7 @@ export const openApiSpec = {
             'application/json': {
               schema: {
                 type: 'object',
-                required: ['title', 'exam', 'href', 'slug', 'questions'],
+                required: ['title', 'exam', 'questions'],
                 properties: {
                   title: { type: 'string', maxLength: 255, example: 'General Aptitude Mock Test 1' },
                   exam: { type: 'string', maxLength: 100, example: 'SSC CGL' },
@@ -92,8 +92,6 @@ export const openApiSpec = {
                   difficulty: { type: 'string', maxLength: 20, default: 'Medium', example: 'Medium' },
                   attempts: { type: 'integer', minimum: 0, default: 0, example: 0 },
                   rating: { type: 'number', minimum: 0, default: 0, example: 0 },
-                  href: { type: 'string', maxLength: 255, example: '/mocktests/ssc-cgl-1' },
-                  slug: { type: 'string', maxLength: 255, example: 'ssc-cgl-1' },
                   is_new: { type: 'boolean', default: false, example: true },
                   is_free: { type: 'boolean', default: true, example: true },
                   questions: {

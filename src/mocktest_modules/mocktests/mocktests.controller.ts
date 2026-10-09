@@ -19,7 +19,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function validateCreateMockTestInput(value: unknown): string | null {
   if (!isRecord(value)) return 'Request body must be a JSON object';
 
-  for (const field of ['title', 'exam', 'href', 'slug']) {
+  for (const field of ['title', 'exam']) {
     if (typeof value[field] !== 'string' || !value[field].trim()) {
       return `${field} is required and must be a non-empty string`;
     }
