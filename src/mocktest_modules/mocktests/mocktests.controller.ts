@@ -101,20 +101,24 @@ type IdentityResult = MocktestIdentity | Response;
 
 async function resolveMocktestIdentity(request: Request, allowNewGuest = false): Promise<IdentityResult> {
   const authorization = request.headers.get('authorization') || request.headers.get('x-access-token');
+  let invalidAuthorization = false;
   if (authorization) {
     const user = getVerifiedAuthUser(request);
-    if (!user) return jsonResponse({ success: false, error: 'Unauthorized. Token missing or invalid.' }, 401);
-    if (!['USER', 'STUDENT', 'ADMIN'].some((role) => hasRole(user, role))) {
-      return jsonResponse({ success: false, error: 'Forbidden. Student role required.' }, 403);
+    if (!user) {
+      invalidAuthorization = true;
+    } else {
+      if (!['USER', 'STUDENT', 'ADMIN'].some((role) => hasRole(user, role))) {
+        return jsonResponse({ success: false, error: 'Forbidden. Student role required.' }, 403);
+      }
+      if (!user.mobile) {
+        return jsonResponse({ success: false, error: 'A verified mobile number is required in the authentication token.' }, 403);
+      }
+      return {
+        owner: { mobile: user.mobile, guestIdHash: null },
+        displayName: user.user_name || user.user_id || user.id,
+        isNewGuest: false,
+      };
     }
-    if (!user.mobile) {
-      return jsonResponse({ success: false, error: 'A verified mobile number is required in the authentication token.' }, 403);
-    }
-    return {
-      owner: { mobile: user.mobile, guestIdHash: null },
-      displayName: user.user_name || user.user_id || user.id,
-      isNewGuest: false,
-    };
   }
 
   const guestId = request.headers.get('x-guest-id')?.trim();
@@ -128,6 +132,10 @@ async function resolveMocktestIdentity(request: Request, allowNewGuest = false):
       guestId,
       isNewGuest: false,
     };
+  }
+
+  if (invalidAuthorization) {
+    return jsonResponse({ success: false, error: 'Unauthorized. Token missing or invalid.' }, 401);
   }
 
   if (!allowNewGuest) {

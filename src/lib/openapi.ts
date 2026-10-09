@@ -256,7 +256,7 @@ export const openApiSpec = {
       get: {
         tags: ['Mocktests'],
         summary: 'Get Current User or Guest Mock Test Attempts',
-        description: 'Returns paginated test and result summaries for the verified JWT mobile or the guest identity supplied in X-Guest-Id.',
+        description: 'Returns paginated test and result summaries for the verified JWT mobile or the guest identity supplied in X-Guest-Id. An authorized JWT takes precedence; if the token is missing or invalid, a valid X-Guest-Id can authenticate the request.',
         security: [{ bearerAuth: [] }, {}],
         parameters: [
           { name: 'page', in: 'query', schema: { type: 'integer', minimum: 1, default: 1 } },
