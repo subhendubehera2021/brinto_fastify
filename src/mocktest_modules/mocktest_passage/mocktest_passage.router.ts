@@ -23,7 +23,7 @@ export async function handleMocktestPassageRoute(request: Request, url: URL): Pr
   }
 
   if (url.pathname === '/api/mocktest-passages/results' && request.method === 'GET') {
-    return await getPassageTypingResultsRequest(url);
+    return await getPassageTypingResultsRequest(request, url);
   }
 
   return null;

@@ -130,7 +130,8 @@ export function buildHonoApp() {
       pathname !== '/api/health' &&
       pathname !== '/api/openapi.json' &&
       pathname !== '/api/mocktests/my-attempts' &&
-      pathname !== '/api/mocktest-passages'
+      pathname !== '/api/mocktest-passages' &&
+      pathname !== '/api/mocktest-passages/results'
     ) {
       try {
         cfCache = (caches as any).default as Cache;
@@ -191,7 +192,11 @@ export function buildHonoApp() {
       c.header(key, val);
     }
     if (!c.res.headers.has('cache-control')) {
-      if (pathname === '/api/mocktests/my-attempts' || pathname === '/api/mocktest-passages') {
+      if (
+        pathname === '/api/mocktests/my-attempts' ||
+        pathname === '/api/mocktest-passages' ||
+        pathname === '/api/mocktest-passages/results'
+      ) {
         c.header('Cache-Control', 'private, no-store, no-cache, must-revalidate, max-age=0');
       } else if (c.req.method === 'GET' && pathname.startsWith('/api/') && pathname !== '/api/health') {
         c.header('Cache-Control', 'public, max-age=30, s-maxage=30, stale-while-revalidate=60');

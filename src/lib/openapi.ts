@@ -142,7 +142,11 @@ export const openApiSpec = {
       post: {
         tags: ['Mocktest Passages'],
         summary: 'Save passage typing result',
-        description: 'Stores a final typing result for a session and passage. The server calculates total_word_count from the passage text and returns pending_word_count; no auth is required when session_id is supplied.',
+        description: 'Stores a final typing result for a session and passage, owned by the verified JWT mobile or the guest identified by X-Guest-Id. The server calculates total_word_count from the passage text and returns pending_word_count.',
+        security: [{ bearerAuth: [] }, {}],
+        parameters: [
+          { name: 'X-Guest-Id', in: 'header', required: false, schema: { type: 'string' }, description: 'Required for guest requests. Send the same guest ID used for mock-test sessions.' },
+        ],
         requestBody: {
           required: true,
           content: {
@@ -165,20 +169,28 @@ export const openApiSpec = {
         responses: {
           '201': { description: 'Typing result saved successfully' },
           '400': { description: 'Invalid request payload or count values' },
+          '401': { description: 'Valid JWT or X-Guest-Id is required' },
+          '403': { description: 'User role is not allowed or the JWT has no mobile claim' },
+          '404': { description: 'Passage not found' },
+          '409': { description: 'Typing result belongs to another user' },
           '503': { description: 'Turso configuration is missing' },
         },
       },
       get: {
         tags: ['Mocktest Passages'],
         summary: 'Get passage typing results for a session',
-        description: 'Returns stored typing results for a session, optionally filtered to one passage.',
+        description: 'Returns typing results for a session owned by the verified JWT mobile or the guest identified by X-Guest-Id, optionally filtered to one passage.',
+        security: [{ bearerAuth: [] }, {}],
         parameters: [
           { name: 'session_id', in: 'query', required: true, schema: { type: 'string' }, example: 'typing-session-123' },
           { name: 'passage_id', in: 'query', required: false, schema: { type: 'integer', minimum: 1 }, example: 42 },
+          { name: 'X-Guest-Id', in: 'header', required: false, schema: { type: 'string' }, description: 'Required for guest requests. Send the same guest ID used when saving the result.' },
         ],
         responses: {
           '200': { description: 'Typing results for the session' },
           '400': { description: 'session_id is missing or passage_id is invalid' },
+          '401': { description: 'Valid JWT or X-Guest-Id is required' },
+          '403': { description: 'User role is not allowed or the JWT has no mobile claim' },
           '503': { description: 'Turso configuration is missing' },
         },
       },

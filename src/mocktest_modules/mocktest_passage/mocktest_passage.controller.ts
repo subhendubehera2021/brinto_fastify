@@ -3,15 +3,56 @@ import {
   createPassage,
   getPassageTypingResultsBySession,
   getRandomPassage,
+  InvalidPassageTypingResultError,
+  PassageNotFoundError,
+  PassageTypingResultOwnershipError,
   savePassageTypingResult,
   TursoDatabaseConfigurationError,
 } from './mocktest_passage.dao';
+import type { MocktestOwner } from '../mocktests/mocktests.dao';
+import { hashGuestId, isValidGuestId } from '../mocktests/guest-id';
 
 function jsonResponse(body: unknown, status: number): Response {
   return new Response(JSON.stringify(body), {
     status,
     headers: { 'Content-Type': 'application/json' },
   });
+}
+
+async function resolveTypingResultOwner(request: Request): Promise<MocktestOwner | Response> {
+  const authorization = request.headers.get('authorization') || request.headers.get('x-access-token');
+  let invalidAuthorization = false;
+  if (authorization) {
+    const user = getVerifiedAuthUser(request);
+    if (!user) {
+      invalidAuthorization = true;
+    } else {
+      if (!['USER', 'STUDENT', 'ADMIN'].some((role) => hasRole(user, role))) {
+        return jsonResponse({ success: false, error: 'Forbidden. Student role required.' }, 403);
+      }
+      if (!user.mobile) {
+        return jsonResponse({ success: false, error: 'A verified mobile number is required in the authentication token.' }, 403);
+      }
+      return { mobile: user.mobile, guestIdHash: null };
+    }
+  }
+
+  const guestId = request.headers.get('x-guest-id')?.trim();
+  if (guestId) {
+    if (!isValidGuestId(guestId)) {
+      return jsonResponse({ success: false, error: 'Invalid guest ID.' }, 401);
+    }
+    return { mobile: null, guestIdHash: await hashGuestId(guestId) };
+  }
+
+  if (invalidAuthorization) {
+    return jsonResponse({ success: false, error: 'Unauthorized. Token missing or invalid.' }, 401);
+  }
+  return jsonResponse({ success: false, error: 'Authentication or X-Guest-Id is required.' }, 401);
+}
+
+function isResponse(value: MocktestOwner | Response): value is Response {
+  return value instanceof Response;
 }
 
 export async function createPassageRequest(request: Request): Promise<Response> {
@@ -112,6 +153,9 @@ export async function getRandomPassageRequest(url: URL): Promise<Response> {
 }
 
 export async function submitPassageTypingResultRequest(request: Request): Promise<Response> {
+  const owner = await resolveTypingResultOwner(request);
+  if (isResponse(owner)) return owner;
+
   let input: unknown;
   try {
     input = await request.json();
@@ -125,23 +169,24 @@ export async function submitPassageTypingResultRequest(request: Request): Promis
 
   const body = input as Record<string, unknown>;
   const sessionId = typeof body.session_id === 'string' ? body.session_id.trim() : '';
-  const passageId = Number(body.passage_id);
-  const keystrokesCount = Number(body.keystrokes_count);
-  const errorCount = Number(body.error_count);
-  const backspaceCount = Number(body.backspace_count);
-  const typedWordCount = Number(body.typed_word_count);
+  const passageId = body.passage_id;
+  const keystrokesCount = body.keystrokes_count;
+  const errorCount = body.error_count;
+  const backspaceCount = body.backspace_count;
+  const typedWordCount = body.typed_word_count;
 
   if (!sessionId) return jsonResponse({ success: false, error: 'session_id is required' }, 400);
-  if (!Number.isSafeInteger(passageId) || passageId < 1) return jsonResponse({ success: false, error: 'passage_id must be a positive integer' }, 400);
-  if (!Number.isSafeInteger(keystrokesCount) || keystrokesCount < 0) return jsonResponse({ success: false, error: 'keystrokes_count must be a non-negative integer' }, 400);
-  if (!Number.isSafeInteger(errorCount) || errorCount < 0) return jsonResponse({ success: false, error: 'error_count must be a non-negative integer' }, 400);
-  if (!Number.isSafeInteger(backspaceCount) || backspaceCount < 0) return jsonResponse({ success: false, error: 'backspace_count must be a non-negative integer' }, 400);
-  if (!Number.isSafeInteger(typedWordCount) || typedWordCount < 0) return jsonResponse({ success: false, error: 'typed_word_count must be a non-negative integer' }, 400);
+  if (typeof passageId !== 'number' || !Number.isSafeInteger(passageId) || passageId < 1) return jsonResponse({ success: false, error: 'passage_id must be a positive integer' }, 400);
+  if (typeof keystrokesCount !== 'number' || !Number.isSafeInteger(keystrokesCount) || keystrokesCount < 0) return jsonResponse({ success: false, error: 'keystrokes_count must be a non-negative integer' }, 400);
+  if (typeof errorCount !== 'number' || !Number.isSafeInteger(errorCount) || errorCount < 0) return jsonResponse({ success: false, error: 'error_count must be a non-negative integer' }, 400);
+  if (typeof backspaceCount !== 'number' || !Number.isSafeInteger(backspaceCount) || backspaceCount < 0) return jsonResponse({ success: false, error: 'backspace_count must be a non-negative integer' }, 400);
+  if (typeof typedWordCount !== 'number' || !Number.isSafeInteger(typedWordCount) || typedWordCount < 0) return jsonResponse({ success: false, error: 'typed_word_count must be a non-negative integer' }, 400);
 
   try {
     const data = await savePassageTypingResult({
       session_id: sessionId,
       passage_id: passageId,
+      owner,
       keystrokes_count: keystrokesCount,
       error_count: errorCount,
       backspace_count: backspaceCount,
@@ -152,12 +197,24 @@ export async function submitPassageTypingResultRequest(request: Request): Promis
     if (error instanceof TursoDatabaseConfigurationError) {
       return jsonResponse({ success: false, error: error.message }, 503);
     }
-    const message = error instanceof Error ? error.message : 'Failed to save passage typing result';
-    return jsonResponse({ success: false, error: message }, 400);
+    if (error instanceof PassageNotFoundError) {
+      return jsonResponse({ success: false, error: error.message }, 404);
+    }
+    if (error instanceof PassageTypingResultOwnershipError) {
+      return jsonResponse({ success: false, error: error.message }, 409);
+    }
+    if (error instanceof InvalidPassageTypingResultError) {
+      return jsonResponse({ success: false, error: error.message }, 400);
+    }
+    console.error('Failed to save passage typing result:', error);
+    return jsonResponse({ success: false, error: 'Failed to save passage typing result' }, 500);
   }
 }
 
-export async function getPassageTypingResultsRequest(url: URL): Promise<Response> {
+export async function getPassageTypingResultsRequest(request: Request, url: URL): Promise<Response> {
+  const owner = await resolveTypingResultOwner(request);
+  if (isResponse(owner)) return owner;
+
   const sessionId = url.searchParams.get('session_id')?.trim();
   if (!sessionId) {
     return jsonResponse({ success: false, error: 'session_id query parameter is required' }, 400);
@@ -170,11 +227,14 @@ export async function getPassageTypingResultsRequest(url: URL): Promise<Response
   }
 
   try {
-    const data = await getPassageTypingResultsBySession(sessionId, passageId);
+    const data = await getPassageTypingResultsBySession(sessionId, owner, passageId);
     return jsonResponse({ success: true, data }, 200);
   } catch (error) {
     if (error instanceof TursoDatabaseConfigurationError) {
       return jsonResponse({ success: false, error: error.message }, 503);
+    }
+    if (error instanceof InvalidPassageTypingResultError) {
+      return jsonResponse({ success: false, error: error.message }, 400);
     }
     console.error('Failed to get passage typing results:', error);
     return jsonResponse({ success: false, error: 'Failed to get passage typing results' }, 500);
