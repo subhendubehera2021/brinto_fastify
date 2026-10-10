@@ -196,6 +196,21 @@ export const openApiSpec = {
       },
     },
     '/api/mocktests': {
+      get: {
+        tags: ['Mocktests'],
+        summary: 'List Mock Tests for Home Screen',
+        description: 'Returns paginated mock-test card data without questions or answer details. Results are ordered newest first.',
+        security: [],
+        parameters: [
+          { name: 'page', in: 'query', required: false, schema: { type: 'integer', minimum: 1, default: 1 } },
+          { name: 'limit', in: 'query', required: false, schema: { type: 'integer', minimum: 1, maximum: 50, default: 10 } },
+        ],
+        responses: {
+          '200': { description: 'Paginated mock test summaries' },
+          '400': { description: 'Invalid page or limit parameter' },
+          '503': { description: 'Turso configuration is missing' },
+        },
+      },
       post: {
         tags: ['Mocktests'],
         summary: 'Create Mock Test',

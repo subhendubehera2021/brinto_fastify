@@ -144,6 +144,39 @@ export async function getMockTestById(testId: number) {
   };
 }
 
+export async function getMockTests(page: number, limit: number) {
+  const client = getTursoClient();
+  const offset = (page - 1) * limit;
+  const [countResult, testsResult] = await Promise.all([
+    client.execute('SELECT COUNT(*) AS total FROM tests'),
+    client.execute({
+      sql: `SELECT id, title, exam, questions, duration, difficulty, attempts, rating, is_new, is_free
+        FROM tests
+        ORDER BY id DESC
+        LIMIT ? OFFSET ?`,
+      args: [limit, offset],
+    }),
+  ]);
+
+  return {
+    tests: testsResult.rows.map((row) => ({
+      id: Number(row.id),
+      title: String(row.title),
+      exam: String(row.exam),
+      questions: Number(row.questions),
+      duration: Number(row.duration),
+      difficulty: String(row.difficulty),
+      attempts: Number(row.attempts),
+      rating: Number(row.rating),
+      is_new: Boolean(Number(row.is_new)),
+      is_free: Boolean(Number(row.is_free)),
+    })),
+    total: Number(countResult.rows[0]?.total ?? 0),
+    page,
+    limit,
+  };
+}
+
 export async function createMockTestSession(displayName: string, owner: MocktestOwner, testId: number) {
   const testResult = await getTursoClient().execute({
     sql: 'SELECT id FROM tests WHERE id = ?',
